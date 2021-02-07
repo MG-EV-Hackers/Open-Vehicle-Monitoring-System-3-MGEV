@@ -31,7 +31,7 @@
 
 #ifndef MG5_OBD_PIDS_H_
 #define MG5_OBD_PIDS_H_
-using namespace std;
+#include <cstdint>
 
 // Module IDs
 constexpr uint32_t broadcastId = 0x7dfu;
