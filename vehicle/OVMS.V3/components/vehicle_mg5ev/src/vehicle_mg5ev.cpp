@@ -35,7 +35,6 @@ static const char *TAG = "v-mg5ev";
 #include "vehicle_mg5ev.h"
 #include "mg5_obd_pids.h"
 #include "mg5_poll_states.h"
-
 #include "metrics_standard.h"
 
 
