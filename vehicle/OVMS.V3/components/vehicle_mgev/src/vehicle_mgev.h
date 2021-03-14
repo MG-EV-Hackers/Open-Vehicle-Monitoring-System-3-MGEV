@@ -84,6 +84,9 @@ class OvmsVehicleMgEv : public OvmsVehicle
             int, OvmsWriter* writer, OvmsCommand*, int, const char* const*);
     void SoftwareVersions(OvmsWriter* writer);
 
+    static void BcmAuthCommand(
+            int, OvmsWriter* writer, OvmsCommand*, int, const char* const*);
+
     static void WakeUp(void* self);
     
     void processEnergy();
@@ -169,6 +172,8 @@ class OvmsVehicleMgEv : public OvmsVehicle
     /// The command registered when the car is made to query the software versions of the
     /// different ECUs
     OvmsCommand* m_cmdSoftver;
+    /// The command registered when the car is made to test authentication with the BCM
+    OvmsCommand* m_cmdBcmauth;
     /// The responses from the software version queries
     std::vector<std::pair<uint32_t, std::vector<char>>> m_versions;
     float mg_cum_energy_charge_wh;

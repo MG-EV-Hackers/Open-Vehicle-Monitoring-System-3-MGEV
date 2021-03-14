@@ -164,6 +164,12 @@ OvmsVehicleMgEv::OvmsVehicleMgEv()
     m_cmdSoftver = MyCommandApp.RegisterCommand(
         "softver", "MG EV Software", &OvmsVehicleMgEv::SoftwareVersions
     );
+
+    // Add command to authenticate with the BCM
+    m_cmdBcmauth = MyCommandApp.RegisterCommand(
+        "bcmauth", "MG EV BCM Authentication", &OvmsVehicleMgEv::BcmAuthCommand
+    );
+
 #ifdef CONFIG_OVMS_COMP_WEBSERVER
     WebInit();
 #endif
@@ -284,6 +290,31 @@ void OvmsVehicleMgEv::SoftwareVersions(OvmsWriter* writer)
     m_poll_plist = obdii_polls;
 }
 
+void OvmsVehicleMgEv::BcmAuthCommand(
+        int, OvmsWriter* writer, OvmsCommand*, int, const char* const*)
+{
+    auto vehicle = MyVehicleFactory.ActiveVehicle();
+    if (vehicle == nullptr)
+    {
+        writer->puts("No active vehicle");
+        return;
+    }
+    if (strcmp(MyVehicleFactory.ActiveVehicleType(), "MG") != 0)
+    {
+        writer->puts("Vehicle is not an MG");
+        return;
+    }
+    auto mg = reinterpret_cast<OvmsVehicleMgEv*>(vehicle);
+    auto bus = mg->m_poll_bus_default;
+    if (bus == nullptr)
+    {
+        writer->puts("The car is not currently being polled");
+        return;
+    }
+    mg->StartBcmAuthentication(bus);
+    writer->puts("BCM authentication started");
+}
+
 const char* OvmsVehicleMgEv::VehicleShortName()
 {
     return "MG";
@@ -340,32 +371,31 @@ void OvmsVehicleMgEv::DeterminePollState(canbus* currentBus, uint32_t ticker)
 
     if (StandardMetrics.ms_v_env_charging12v->AsBool())
     {
-        // 12 V is charging, if this state has just changed we go straignt to running pollstate
+        // 12 V is charging, if this state has just changed we go straight to running pollstate
         StandardMetrics.ms_v_env_awake->SetValue(true);
         m_afterRunTicker = 0u;
-        if (charging12vLast != StandardMetrics.ms_v_env_charging12v->AsBool())
+        if (!charging12vLast)
         {
             StartAuthentication(currentBus);
             PollSetState(PollStateRunning);
             ESP_LOGI(TAG, "12V has just started charging, setting to running poll mode. Reading");
         } 
 
-        if(m_gwmState == Undefined)
+        if (m_gwmState == Undefined)
         {
             PollSetState(PollStateRunning);
             ESP_LOGI(TAG, "GWM in Unknown state, possibly just changed vehicle type. Setting to running poll mode.");
         } 
 
-        
-        if ( carIgnitionOn && m_gwmState !=SendDiagnostic) // If ignition is on, we should set the car into running pollstate, Diagnostic override confuses things
+        if (carIgnitionOn && m_gwmState != SendDiagnostic) // If ignition is on, we should set the car into running pollstate, Diagnostic override confuses things
         {
-            if( m_gwmState != SendTester )
+            if (m_gwmState != SendTester)
             {
                 m_gwmState = SendTester;
                 ESP_LOGI(TAG, "Car is Detected as Running, setting Tester Present GWM Mode");
             }
 
-            if( m_poll_state != PollStateRunning)
+            if (m_poll_state != PollStateRunning)
             {
                 // Car ignition Is on
                 PollSetState(PollStateRunning);
@@ -375,19 +405,17 @@ void OvmsVehicleMgEv::DeterminePollState(canbus* currentBus, uint32_t ticker)
             carIsResponsiveToQueries = true;
             m_noRxCount = 0u;
             m_diagCount = 0;
-            m_preZombieOverrideTicker = 0; 
-            
-            
+            m_preZombieOverrideTicker = 0;
         } 
         else if (carIsCharging) // If car is in a charging state we should set charging pollstate
         {
-            if(m_poll_state != PollStateCharging)
+            if (m_poll_state != PollStateCharging)
             {
                 PollSetState(PollStateCharging);
                 // Do not want to set GWM control here as it should remain in previous state
                 ESP_LOGI(TAG, "Car is Detected as Charging, setting Charging Pollstate" );
             }
-            if( m_gwmState != SendDiagnostic && m_gwmState != SendTester)
+            if (m_gwmState != SendDiagnostic && m_gwmState != SendTester)
             {
                 m_gwmState = SendTester;
                 ESP_LOGI(TAG, "Car is Detected as Charging without Session Override, setting Tester Present GWM Mode");
@@ -397,15 +425,14 @@ void OvmsVehicleMgEv::DeterminePollState(canbus* currentBus, uint32_t ticker)
             m_noRxCount = 0u;
             m_diagCount = 0;
             m_preZombieOverrideTicker = 0; 
-            
-        } else if (StandardMetrics.ms_v_bat_soc->AsFloat() >= 97.0) // Car has completed charge, topping off 12V
+        }
+        else if (StandardMetrics.ms_v_bat_soc->AsFloat() >= 97.0) // Car has completed charge, topping off 12V
         {
             ESP_LOGV(TAG, "Vehicle is topping of the 12V and is fully charged");
         }
-        else // State is not known
+        else  // State is not known
         {
-            
-            if( m_poll_state != PollStateListenOnly)
+            if (m_poll_state != PollStateListenOnly)
             {
                 ESP_LOGV(TAG, "Vehicle State is Unknown, checking if responsive");
             }
@@ -414,17 +441,16 @@ void OvmsVehicleMgEv::DeterminePollState(canbus* currentBus, uint32_t ticker)
             {
                 ESP_LOGV(TAG, "RX Frames Recieved, rx %i and m_rx %i and count %i ", rxPackets, m_rxPackets, m_noRxCount);
                 m_rxPackets = rxPackets;
-                if( m_noRxCount != 0)
+                if (m_noRxCount != 0)
                 {
-                    m_noRxCount --;
+                    --m_noRxCount;
                 }
-                
             }
             else
             {
                 ESP_LOGV(TAG, "No RX Frames Recieved, rx %i and m_rx %i and count %i ", rxPackets, m_rxPackets, m_noRxCount);
-                m_noRxCount ++;
-                if( m_noRxCount >= ZOMBIE_DETECT_TIMEOUT)
+                ++m_noRxCount;
+                if (m_noRxCount >= ZOMBIE_DETECT_TIMEOUT)
                 {
                     carIsResponsiveToQueries = false;
                     ZombieMode();
@@ -434,10 +460,8 @@ void OvmsVehicleMgEv::DeterminePollState(canbus* currentBus, uint32_t ticker)
     } 
     else
     {
-        
         // 12 V is now not charging, notify
-        
-        if( m_gwmState == SendDiagnostic)
+        if (m_gwmState == SendDiagnostic)
         {
             //Immediately sleep if we were in diagnostics mode
             ESP_LOGI(TAG, "12V has stopped charging, as we were sending diagnostics override, immediately stop this and all polling to unlock cable.");
@@ -456,30 +480,29 @@ void OvmsVehicleMgEv::DeterminePollState(canbus* currentBus, uint32_t ticker)
                 StandardMetrics.ms_v_charge_state->SetValue("stopped");
                 StandardMetrics.ms_v_charge_inprogress->SetValue(false);
             }
-        }else if (charging12vLast != StandardMetrics.ms_v_env_charging12v->AsBool())
+        }
+        else if (charging12vLast != StandardMetrics.ms_v_env_charging12v->AsBool())
         {
             ESP_LOGI(TAG, "12V has stopped charging, remain in current state for %i seconds.", TRANSITION_TIMEOUT);
             //StandardMetrics.ms_v_env_on->SetValue(false);
         }
-        m_afterRunTicker ++;
-        if(m_afterRunTicker == TRANSITION_TIMEOUT)
+
+        ++m_afterRunTicker;
+        if (m_afterRunTicker == TRANSITION_TIMEOUT)
         {
             ESP_LOGI(TAG, "12V has not been charging for timeout, stopping all CAN transmission.");
             PollSetState(PollStateListenOnly);
             m_gwmState = AllowToSleep;
             StandardMetrics.ms_v_env_awake->SetValue(false);
         } 
-        else if(m_afterRunTicker >= TRANSITION_TIMEOUT)
+        else if (m_afterRunTicker >= TRANSITION_TIMEOUT)
         {
             // Do not let afterrun ticker go crazy, peg it at TRANSITION_TIMEOUT + 1
             m_afterRunTicker = (TRANSITION_TIMEOUT +1) ;
         }
-
-        
-
     }
 
-    if( m_afterRunTicker != (TRANSITION_TIMEOUT +1))
+    if (m_afterRunTicker != (TRANSITION_TIMEOUT +1))
     {
         ESP_LOGV(TAG, "Pollstate: %i , GWM State: %i , Rx Packet Count: %i , 12V level: %.2f.", m_poll_state, m_gwmState, rxPackets, voltage12V);
     }
@@ -495,30 +518,30 @@ void OvmsVehicleMgEv::ZombieMode()
         // Polling is disabled, so there's nothing to do here
         return;
     }
-    if( m_diagCount > DIAG_ATTEMPTS)
+    if (m_diagCount > DIAG_ATTEMPTS)
     {
-        if( m_poll_state != PollStateBackup)
+        if (m_poll_state != PollStateBackup)
         {
             ESP_LOGI(TAG, "Maximum number of Session Override Attempts Limit Reached going to backup mode, SoC reports only");
             PollSetState(PollStateBackup);
         }
         return;
     }
-    
-    if(m_preZombieOverrideTicker == 0)
+
+    if (m_preZombieOverrideTicker == 0)
     {
         ESP_LOGI(TAG, "OVMS thinks the GWM is in Zombie Mode, we are stopping all queries for 50 s until to try session override");
         PollSetState(PollStateListenOnly);
         m_gwmState = AllowToSleep;
     }
-    m_preZombieOverrideTicker ++;
-    if( m_preZombieOverrideTicker <= ZOMBIE_TIMEOUT)
+    ++m_preZombieOverrideTicker;
+    if (m_preZombieOverrideTicker <= ZOMBIE_TIMEOUT)
     {
         ESP_LOGV(TAG, "Zombie Wait for %i Seconds.", m_preZombieOverrideTicker);
         return;
     }
-    m_diagCount ++;
-    
+    ++m_diagCount;
+
     m_preZombieOverrideTicker = 0u;
     m_noRxCount = 0u;
     ESP_LOGI(TAG, "Sending Session Override");
@@ -529,7 +552,6 @@ void OvmsVehicleMgEv::ZombieMode()
     }
     PollSetState(PollStateCharging);
     m_gwmState = SendDiagnostic;
-    return;
 }
 
 void OvmsVehicleMgEv::SendAlarmSensitive(canbus* currentBus)
@@ -602,7 +624,7 @@ void OvmsVehicleMgEv::Ticker1(uint32_t ticker)
         SendTesterPresentTo(currentBus, gwmId);
     }
 
-    if(m_gwmState == SendDiagnostic)
+    if (m_gwmState == SendDiagnostic)
     {
         SendDiagSessionTo(currentBus, gwmId, 2u);
         SendDiagSessionTo(currentBus, ipkId, 2u);
@@ -708,9 +730,11 @@ void OvmsVehicleMgEv::processEnergy()
     
     // Only calculate if the car is turned on and not charging.
     if (StandardMetrics.ms_v_env_awake->AsBool() &&
-        !StandardMetrics.ms_v_charge_inprogress->AsBool()) {
+        !StandardMetrics.ms_v_charge_inprogress->AsBool())
+    {
         // Are we in READY state? Ready to drive off.
-        if (StandardMetrics.ms_v_env_on->AsBool()) {
+        if (StandardMetrics.ms_v_env_on->AsBool())
+        {
             auto bat_power = StandardMetrics.ms_v_bat_voltage->AsFloat() *
             StandardMetrics.ms_v_bat_current->AsFloat() / 1000;
             // Calculate battery power (kW) for one second
@@ -721,24 +745,29 @@ void OvmsVehicleMgEv::processEnergy()
             StandardMetrics.ms_v_bat_power->SetValue(bat_power);
             // Car is still parked so trip has not started.
             // Set all values to zero
-            if (StandardMetrics.ms_v_env_drivetime->AsInt() == 0) {
+            if (StandardMetrics.ms_v_env_drivetime->AsInt() == 0)
+            {
                 ESP_LOGI(TAG, "Trip has started");
                 StandardMetrics.ms_v_bat_coulomb_used->SetValue(0);
                 StandardMetrics.ms_v_bat_coulomb_recd->SetValue(0);
                 StandardMetrics.ms_v_bat_energy_used->SetValue(0);
                 StandardMetrics.ms_v_bat_energy_recd->SetValue(0);
+            }
             // Otherwise we are already moving so do calculations
-            } else {
+            else
+            {
                 // Calculate regeneration power
-                if (bat_power < 0) {
+                if (bat_power < 0)
+                {
                     StandardMetrics.ms_v_bat_energy_recd->SetValue
-                    (StandardMetrics.ms_v_bat_energy_recd->AsFloat() + -(energy));
+                    (StandardMetrics.ms_v_bat_energy_recd->AsFloat() - energy);
                     
                     StandardMetrics.ms_v_bat_coulomb_recd->SetValue
-                    (StandardMetrics.ms_v_bat_coulomb_recd->AsFloat() + -(coulombs));
-                    
+                    (StandardMetrics.ms_v_bat_coulomb_recd->AsFloat() - coulombs);
+                }
                 // Calculate power usage. Add power used each second
-                } else {
+                else
+                {
                     StandardMetrics.ms_v_bat_energy_used->SetValue
                     (StandardMetrics.ms_v_bat_energy_used->AsFloat() + energy);
                     
@@ -746,8 +775,10 @@ void OvmsVehicleMgEv::processEnergy()
                     (StandardMetrics.ms_v_bat_coulomb_used->AsFloat() + coulombs);
                 }
             }
+        }
         // Not in READY so must have been turned off
-        } else {
+        else
+        {
             // We have only just stopped so add trip values to the totals
             if (StandardMetrics.ms_v_env_parktime->AsInt() == 0) {
                 ESP_LOGI(TAG, "Trip has ended");
@@ -771,15 +802,16 @@ void OvmsVehicleMgEv::processEnergy()
     }
     
     // Add cumulative charge energy each second to ms_v_charge_power
-    if(StandardMetrics.ms_v_charge_inprogress->AsBool())
+    if (StandardMetrics.ms_v_charge_inprogress->AsBool())
     {
-        mg_cum_energy_charge_wh += StandardMetrics.ms_v_charge_power->AsFloat()*1000/3600;
-        StandardMetrics.ms_v_charge_kwh->SetValue(mg_cum_energy_charge_wh/1000);
-    // When we are not charging set back to zero ready for next charge.
-    } else {
-        mg_cum_energy_charge_wh=0;
+        mg_cum_energy_charge_wh += StandardMetrics.ms_v_charge_power->AsFloat() / 3.6f;
+        StandardMetrics.ms_v_charge_kwh->SetValue(mg_cum_energy_charge_wh / 1000.0f);
     }
-
+    // When we are not charging set back to zero ready for next charge.
+    else
+    {
+        mg_cum_energy_charge_wh = 0;
+    }
 }
 
 OvmsVehicle::vehicle_command_t OvmsVehicleMgEv::CommandWakeup()
