@@ -162,26 +162,9 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
             break;
         case batterySoCPid:
             {
-                // Get selection from features page
-                bool updatedbmu = MyConfig.GetParamValueBool("xmg", "updatedbmu", true);
-                float scaledSoc;
-                int lowerlimit;
-                int upperlimit;
                 // Get raw value to display on Charging Metrics Page
                 m_soc_raw->SetValue(value / 10);
-                // Setup upper and lower limits
-                if (updatedbmu)
-                {
-                    //New BMU firmware DoD range 40 - 940
-                    lowerlimit = 40;
-                    upperlimit = 940;
-                } else {
-                    //Original BMU firmware DoD range 60 - 970
-                    lowerlimit = 60;
-                    upperlimit = 970;
-                }
-                // Calculate SOC from upper and lower limits
-                scaledSoc = (value - lowerlimit) * 100 / (upperlimit - lowerlimit);
+                auto scaledSoc = calculateSoc(value);
                 if (StandardMetrics.ms_v_charge_inprogress->AsBool())
                 {
                     if (scaledSoc < 99.5)
@@ -245,4 +228,26 @@ void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
             } 
             break;
     }
+}
+
+float OvmsVehicleMgEv::calculateSoc(uint16_t value)
+{
+    int lowerlimit;
+    int upperlimit;
+    
+    // Setup upper and lower limits from selection on features page
+    if (MyConfig.GetParamValueBool("xmg", "updatedbmu", true))
+    {
+        //New BMU firmware DoD range 40 - 940
+        lowerlimit = 40;
+        upperlimit = 940;
+    }
+    else
+    {
+        //Original BMU firmware DoD range 60 - 970
+        lowerlimit = 60;
+        upperlimit = 970;
+    }
+    // Calculate SOC from upper and lower limits
+    return (value - lowerlimit) * 100 / (upperlimit - lowerlimit);
 }

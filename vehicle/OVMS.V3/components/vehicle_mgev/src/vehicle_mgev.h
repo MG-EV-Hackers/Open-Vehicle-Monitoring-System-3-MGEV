@@ -87,6 +87,7 @@ class OvmsVehicleMgEv : public OvmsVehicle
     static void WakeUp(void* self);
     
     void processEnergy();
+    float calculateSoc(uint16_t value);
 
     void IncomingPollFrame(CAN_frame_t* frame);
     bool SendPollMessage(canbus* bus, uint16_t id, uint8_t type, uint16_t pid);

@@ -172,13 +172,13 @@ OvmsVehicleMgEv::OvmsVehicleMgEv()
 OvmsVehicleMgEv::~OvmsVehicleMgEv()
 {
     ESP_LOGI(TAG, "Shutdown MG EV vehicle module");
-
+    
     //xTimerDelete(m_zombieTimer, 0);
     
-    #ifdef CONFIG_OVMS_COMP_WEBSERVER
-        WebDeInit();
-    #endif
-
+#ifdef CONFIG_OVMS_COMP_WEBSERVER
+    WebDeInit();
+#endif
+    
     if (m_cmdSoftver)
     {
         MyCommandApp.UnregisterCommand(m_cmdSoftver->GetName());
