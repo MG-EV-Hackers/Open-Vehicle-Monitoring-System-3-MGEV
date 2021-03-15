@@ -1,6 +1,7 @@
 Open Vehicle Monitor System v3 - Change log
 
 ????-??-?? ???  ???????  OTA release
+- MG ZS EV: Add new features page to select car's BMS firmware release to adjust SOC display.
 - VW e-Up: CCS (DC) charge detection & data
   New metrics:
     xvu.c.ccs.u             -- CCS charger supplied voltage [V]
