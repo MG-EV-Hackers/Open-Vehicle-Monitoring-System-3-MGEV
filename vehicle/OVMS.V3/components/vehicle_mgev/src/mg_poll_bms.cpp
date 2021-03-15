@@ -163,7 +163,7 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
         case batterySoCPid:
             {
                 // Get raw value to display on Charging Metrics Page
-                m_soc_raw->SetValue(value / 10);
+                m_soc_raw->SetValue(value / 10.0f);
                 auto scaledSoc = calculateSoc(value);
                 if (StandardMetrics.ms_v_charge_inprogress->AsBool())
                 {
@@ -249,5 +249,5 @@ float OvmsVehicleMgEv::calculateSoc(uint16_t value)
         upperlimit = 970;
     }
     // Calculate SOC from upper and lower limits
-    return (value - lowerlimit) * 100 / (upperlimit - lowerlimit);
+    return (value - lowerlimit) * 100.0f / (upperlimit - lowerlimit);
 }
