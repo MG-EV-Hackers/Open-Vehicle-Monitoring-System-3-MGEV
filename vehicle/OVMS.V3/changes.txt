@@ -2,6 +2,17 @@ Open Vehicle Monitor System v3 - Change log
 
 ????-??-?? ???  ???????  OTA release
 - MG ZS EV: Add new features page to select car's BMS firmware release to adjust SOC display.
+- New vehicle: Maxus eDeliver 3 via OBD-II Port (MEDS)
+- Vehicle: emit standard events on changing v.c.timermode
+  New events:
+    vehicle.charge.timermode.off   -- Vehicle charge timer mode has been switched off
+    vehicle.charge.timermode.on    -- Vehicle charge timer mode has been switched on
+- VW e-Up/OBD: detect charge timer mode
+  New metrics:
+    xvu.c.limit.soc.max            -- Charge schedule maximum SOC [%]
+    xvu.c.limit.soc.min            -- Charge schedule minimum SOC [%]
+    xvu.c.timermode.def            -- Charge timer defined & default [bool]
+
 - VW e-Up: CCS (DC) charge detection & data
   New metrics:
     xvu.c.ccs.u             -- CCS charger supplied voltage [V]
