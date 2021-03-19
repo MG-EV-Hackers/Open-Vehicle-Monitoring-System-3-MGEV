@@ -77,39 +77,40 @@ struct DashboardConfig;
 // with additional arguments.
 
 
-#define VEHICLE_POLL_TYPE_NONE          0x00
+#define VEHICLE_POLL_TYPE_NONE            0x00
 
 // OBD (ISO 15031) service identifiers supported:
-#define VEHICLE_POLL_TYPE_OBDIICURRENT  0x01 // Mode 01 "current data" (8 bit PID)
-#define VEHICLE_POLL_TYPE_OBDIIFREEZE   0x02 // Mode 02 "freeze frame data" (8 bit PID)
-#define VEHICLE_POLL_TYPE_READ_ERDTC    0x03 // Mode 03 read emission-related DTC (no PID)
-#define VEHICLE_POLL_TYPE_CLEAR_ERDTC   0x04 // Mode 04 clear/reset emission-related DTC (no PID)
-#define VEHICLE_POLL_TYPE_READOXSTEST   0x05 // Mode 05 read oxygen sensor monitoring test results (16 bit PID)
-#define VEHICLE_POLL_TYPE_READOBMTEST   0x06 // Mode 06 read on-board monitoring test results (8 bit PID)
-#define VEHICLE_POLL_TYPE_READ_DCERDTC  0x07 // Mode 07 read driving cycle emission-related DTC (no PID)
-#define VEHICLE_POLL_TYPE_REQOBUCTRL    0x08 // Mode 08 request on-board unit control (8 bit PID)
-#define VEHICLE_POLL_TYPE_OBDIIVEHICLE  0x09 // Mode 09 "vehicle information" (8 bit PID)
-#define VEHICLE_POLL_TYPE_READ_PERMDTC  0x0A // Mode 0A read permanent (cleared) DTC (no PID)
+#define VEHICLE_POLL_TYPE_OBDIICURRENT    0x01 // Mode 01 "current data" (8 bit PID)
+#define VEHICLE_POLL_TYPE_OBDIIFREEZE     0x02 // Mode 02 "freeze frame data" (8 bit PID)
+#define VEHICLE_POLL_TYPE_READ_ERDTC      0x03 // Mode 03 read emission-related DTC (no PID)
+#define VEHICLE_POLL_TYPE_CLEAR_ERDTC     0x04 // Mode 04 clear/reset emission-related DTC (no PID)
+#define VEHICLE_POLL_TYPE_READOXSTEST     0x05 // Mode 05 read oxygen sensor monitoring test results (16 bit PID)
+#define VEHICLE_POLL_TYPE_READOBMTEST     0x06 // Mode 06 read on-board monitoring test results (8 bit PID)
+#define VEHICLE_POLL_TYPE_READ_DCERDTC    0x07 // Mode 07 read driving cycle emission-related DTC (no PID)
+#define VEHICLE_POLL_TYPE_REQOBUCTRL      0x08 // Mode 08 request on-board unit control (8 bit PID)
+#define VEHICLE_POLL_TYPE_OBDIIVEHICLE    0x09 // Mode 09 "vehicle information" (8 bit PID)
+#define VEHICLE_POLL_TYPE_READ_PERMDTC    0x0A // Mode 0A read permanent (cleared) DTC (no PID)
 
 // UDS (ISO 14229) service identifiers supported:
-#define VEHICLE_POLL_TYPE_OBDIISESSION  0x10 // UDS: Diagnostic Session Control (8 bit PID)
-#define VEHICLE_POLL_TYPE_TESTERPRESENT 0x3E // UDS: TesterPresent (8 bit PID)
-#define VEHICLE_POLL_TYPE_SECACCESS     0x27 // UDS: SecurityAccess (8 bit PID)
-#define VEHICLE_POLL_TYPE_COMCONTROL    0x28 // UDS: CommunicationControl (8 bit PID)
-#define VEHICLE_POLL_TYPE_ECURESET      0x11 // UDS: ECUReset (8 bit PID)
-#define VEHICLE_POLL_TYPE_CLEARDTC      0x14 // UDS: ClearDiagnosticInformation (no PID)
-#define VEHICLE_POLL_TYPE_READDTC       0x19 // UDS: ReadDTCInformation (8 bit PID)
-#define VEHICLE_POLL_TYPE_OBDIIEXTENDED 0x22 // UDS: ReadDataByIdentifier (16 bit PID) (legacy alias for READDATA)
-#define VEHICLE_POLL_TYPE_READDATA      0x22 // UDS: ReadDataByIdentifier (16 bit PID)
-#define VEHICLE_POLL_TYPE_READMEMORY    0x23 // UDS: ReadMemoryByAddress (no PID)
-#define VEHICLE_POLL_TYPE_READSCALING   0x24 // UDS: ReadScalingDataByIdentifier (16 bit PID)
-#define VEHICLE_POLL_TYPE_WRITEDATA     0x2E // UDS: WriteDataByIdentifier (16 bit PID)
-#define VEHICLE_POLL_TYPE_WRITEMEMORY   0x3D // UDS: WriteMemoryByAddress (8 bit PID)
-#define VEHICLE_POLL_TYPE_IOCONTROL     0x2F // UDS: InputOutputControlByIdentifier (16 bit PID)
+#define VEHICLE_POLL_TYPE_OBDIISESSION    0x10 // UDS: Diagnostic Session Control (8 bit PID)
+#define VEHICLE_POLL_TYPE_TESTERPRESENT   0x3E // UDS: TesterPresent (8 bit PID)
+#define VEHICLE_POLL_TYPE_SECACCESS       0x27 // UDS: SecurityAccess (8 bit PID)
+#define VEHICLE_POLL_TYPE_COMCONTROL      0x28 // UDS: CommunicationControl (8 bit PID)
+#define VEHICLE_POLL_TYPE_ECURESET        0x11 // UDS: ECUReset (8 bit PID)
+#define VEHICLE_POLL_TYPE_CLEARDTC        0x14 // UDS: ClearDiagnosticInformation (no PID)
+#define VEHICLE_POLL_TYPE_READDTC         0x19 // UDS: ReadDTCInformation (8 bit PID)
+#define VEHICLE_POLL_TYPE_OBDIIEXTENDED   0x22 // UDS: ReadDataByIdentifier (16 bit PID) (legacy alias for READDATA)
+#define VEHICLE_POLL_TYPE_READDATA        0x22 // UDS: ReadDataByIdentifier (16 bit PID)
+#define VEHICLE_POLL_TYPE_READMEMORY      0x23 // UDS: ReadMemoryByAddress (no PID)
+#define VEHICLE_POLL_TYPE_READSCALING     0x24 // UDS: ReadScalingDataByIdentifier (16 bit PID)
+#define VEHICLE_POLL_TYPE_WRITEDATA       0x2E // UDS: WriteDataByIdentifier (16 bit PID)
+#define VEHICLE_POLL_TYPE_ROUTINECONTROL  0x31 // UDS: Routine Control (16 bit PID)
+#define VEHICLE_POLL_TYPE_WRITEMEMORY     0x3D // UDS: WriteMemoryByAddress (8 bit PID)
+#define VEHICLE_POLL_TYPE_IOCONTROL       0x2F // UDS: InputOutputControlByIdentifier (16 bit PID)
 
 // Other service identifiers supported:
-#define VEHICLE_POLL_TYPE_OBDII_1A      0x1A // Custom: Mode 1A (8 bit PID)
-#define VEHICLE_POLL_TYPE_OBDIIGROUP    0x21 // Custom: Read data by 8 bit PID
+#define VEHICLE_POLL_TYPE_OBDII_1A        0x1A // Custom: Mode 1A (8 bit PID)
+#define VEHICLE_POLL_TYPE_OBDIIGROUP      0x21 // Custom: Read data by 8 bit PID
 
 // Utils:
 #define POLL_TYPE_HAS_16BIT_PID(type) \
@@ -117,7 +118,8 @@ struct DashboardConfig;
    (type) == VEHICLE_POLL_TYPE_READSCALING || \
    (type) == VEHICLE_POLL_TYPE_WRITEDATA || \
    (type) == VEHICLE_POLL_TYPE_IOCONTROL || \
-   (type) == VEHICLE_POLL_TYPE_READOXSTEST)
+   (type) == VEHICLE_POLL_TYPE_READOXSTEST || \
+   (type) == VEHICLE_POLL_TYPE_ROUTINECONTROL)
 #define POLL_TYPE_HAS_NO_PID(type) \
   ((type) == VEHICLE_POLL_TYPE_CLEARDTC || \
    (type) == VEHICLE_POLL_TYPE_READMEMORY || \
@@ -129,59 +131,59 @@ struct DashboardConfig;
   (!POLL_TYPE_HAS_NO_PID(type) && !POLL_TYPE_HAS_16BIT_PID(type))
 
 // OBD/UDS Negative Response Code
-#define UDS_RESP_TYPE_NRC               0x7F  // see ISO 14229 Annex A.1
-#define UDS_RESP_NRC_RCRRP              0x78  // … requestCorrectlyReceived-ResponsePending
+#define UDS_RESP_TYPE_NRC                 0x7F  // see ISO 14229 Annex A.1
+#define UDS_RESP_NRC_RCRRP                0x78  // … requestCorrectlyReceived-ResponsePending
 
 // Number of polling states supported
-#define VEHICLE_POLL_NSTATES            4
+#define VEHICLE_POLL_NSTATES              4
 
 // Macro for poll_pid_t termination
-#define POLL_LIST_END                   { 0, 0, 0x00, 0x00, { 0, 0, 0 }, 0, 0 }
+#define POLL_LIST_END                     { 0, 0, 0x00, 0x00, { 0, 0, 0 }, 0, 0 }
 
 // PollSingleRequest specific result codes:
-#define POLLSINGLE_OK                   0 
-#define POLLSINGLE_TIMEOUT              -1
-#define POLLSINGLE_TXFAILURE            -2
+#define POLLSINGLE_OK                     0 
+#define POLLSINGLE_TIMEOUT                -1
+#define POLLSINGLE_TXFAILURE              -2
 
 
 // Standard MSG protocol commands:
 
-#define CMD_QueryFeatures               1   // ()
-#define CMD_SetFeature                  2   // (feature number, value)
-#define CMD_QueryParams                 3   // ()
-#define CMD_SetParam                    4   // (param number, value)
-#define CMD_Reboot                      5   // ()
-#define CMD_Alert                       6   // ()
-#define CMD_Execute                     7   // (text command with arguments)
-#define CMD_SetChargeMode               10  // (mode)
-#define CMD_StartCharge                 11  // ()
-#define CMD_StopCharge                  12  // ()
-#define CMD_SetChargeCurrent            15  // (amps)
-#define CMD_SetChargeModeAndCurrent     16  // (mode, amps)
-#define CMD_SetChargeTimer              17  // (mode, start time)
-#define CMD_WakeupCar                   18  // ()
-#define CMD_WakeupTempSystem            19  // ()
-#define CMD_Lock                        20  // (pin)
-#define CMD_ValetOn                     21  // (pin)
-#define CMD_UnLock                      22  // (pin)
-#define CMD_ValetOff                    23  // (pin)
-#define CMD_Homelink                    24  // (button_nr)
-#define CMD_CoolDown                    25  // ()
-#define CMD_ClimateControl              26  // (mode)
+#define CMD_QueryFeatures                 1   // ()
+#define CMD_SetFeature                    2   // (feature number, value)
+#define CMD_QueryParams                   3   // ()
+#define CMD_SetParam                      4   // (param number, value)
+#define CMD_Reboot                        5   // ()
+#define CMD_Alert                         6   // ()
+#define CMD_Execute                       7   // (text command with arguments)
+#define CMD_SetChargeMode                 10  // (mode)
+#define CMD_StartCharge                   11  // ()
+#define CMD_StopCharge                    12  // ()
+#define CMD_SetChargeCurrent              15  // (amps)
+#define CMD_SetChargeModeAndCurrent       16  // (mode, amps)
+#define CMD_SetChargeTimer                17  // (mode, start time)
+#define CMD_WakeupCar                     18  // ()
+#define CMD_WakeupTempSystem              19  // ()
+#define CMD_Lock                          20  // (pin)
+#define CMD_ValetOn                       21  // (pin)
+#define CMD_UnLock                        22  // (pin)
+#define CMD_ValetOff                      23  // (pin)
+#define CMD_Homelink                      24  // (button_nr)
+#define CMD_CoolDown                      25  // ()
+#define CMD_ClimateControl                26  // (mode)
 // 30-39 reserved for server commands
-#define CMD_SendSMS                     40  // (phone number, SMS message)
-#define CMD_SendUSSD                    41  // (USSD_CODE)
-#define CMD_SendRawAT                   49  // (raw AT command)
+#define CMD_SendSMS                       40  // (phone number, SMS message)
+#define CMD_SendUSSD                      41  // (USSD_CODE)
+#define CMD_SendRawAT                     49  // (raw AT command)
 // 200+ reserved for custom commands
 
 
 // BMS default deviation thresholds:
-#define BMS_DEFTHR_VMAXGRAD             0.010   // [V]
-#define BMS_DEFTHR_VMAXSDDEV            0.010   // [V]
-#define BMS_DEFTHR_VWARN                0.020   // [V]
-#define BMS_DEFTHR_VALERT               0.030   // [V]
-#define BMS_DEFTHR_TWARN                2.00    // [°C]
-#define BMS_DEFTHR_TALERT               3.00    // [°C]
+#define BMS_DEFTHR_VMAXGRAD               0.010   // [V]
+#define BMS_DEFTHR_VMAXSDDEV              0.010   // [V]
+#define BMS_DEFTHR_VWARN                  0.020   // [V]
+#define BMS_DEFTHR_VALERT                 0.030   // [V]
+#define BMS_DEFTHR_TWARN                  2.00    // [°C]
+#define BMS_DEFTHR_TALERT                 3.00    // [°C]
 
 
 class OvmsVehicle : public InternalRamAllocated
