@@ -89,7 +89,7 @@ void OvmsVehicleMgEv::IncomingPollFrame(CAN_frame_t* frame)
         // }
     }
 
-    uint8_t frameType = frame->data.u8[0] >> 4;
+    uint8_t frameType = frame->data.u8[1] >> 4;
     uint8_t frameLength = frame->data.u8[0] & 0x0f;
     uint8_t* data = &frame->data.u8[1];
     uint8_t dataLength = frameLength;
@@ -131,14 +131,14 @@ void OvmsVehicleMgEv::IncomingPollFrame(CAN_frame_t* frame)
     }
     if (frame->MsgID == (gwmId | rxFlag) && (frameType & 4))
     {
-        ESP_LOGV(TAG, "Got an gateway authentication response");
-        GwmAuthentication(frame->origin, frameType & 3, data);
+        ESP_LOGV(TAG, "Got a gateway authentication response");
+        GwmAuthentication(frame->origin, frameType & 3, &data[1]);
         return;
     }
     if (frame->MsgID == (bcmId | rxFlag) && (frameType & 4))
     {
         ESP_LOGV(TAG, "Got a BCM authentication response");
-        BcmAuthentication(frame->origin, frameType & 3, data);
+        BcmAuthentication(frame->origin, frameType & 3, &data[1]);
         return;
     }
     if (frameType == ISOTP_FT_SINGLE || frameType == ISOTP_FT_FIRST)

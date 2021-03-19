@@ -84,13 +84,14 @@ uint32_t pass2(uint32_t seed)
 
 bool OvmsVehicleMgEv::StartAuthentication(canbus* currentBus)
 {
+    ESP_LOGI(TAG, "Starting GWM authentication");
     CAN_frame_t authStart = {
         currentBus,
         nullptr,
-        { .B = { 2, 0, CAN_no_RTR, CAN_frame_std, 0 } },
+        { .B = { 8, 0, CAN_no_RTR, CAN_frame_std, 0 } },
         gwmId,
         { .u8 = {
-            (ISOTP_FT_FIRST<<4), 1, 0, 0, 0, 0, 0, 0
+            2, (ISOTP_FT_FIRST<<4), 1, 0, 0, 0, 0, 0,
         } }
     };
     return currentBus->Write(&authStart) != ESP_FAIL;
@@ -101,10 +102,10 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t frameType, u
     CAN_frame_t nextFrame = {
         currentBus,
         nullptr,
-        { .B = { 0, 0, CAN_no_RTR, CAN_frame_std, 0 } },
+        { .B = { 8, 0, CAN_no_RTR, CAN_frame_std, 0 } },
         gwmId,
         { .u8 = {
-            (ISOTP_FT_CONSECUTIVE<<4) + 7, 0, 0, 0, 0, 0, 0, 0
+            6, (ISOTP_FT_CONSECUTIVE<<4) + 7, 0, 0, 0, 0, 0, 0,
         } }
     };
 
@@ -115,20 +116,21 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t frameType, u
         if (*data == 1u)
         {
             // First session start, start another
-            nextFrame.data.u8[0] = (ISOTP_FT_FIRST<<4);
-            nextFrame.data.u8[1] = 3u;
-            nextFrame.FIR.B.DLC = 2u;
+            ESP_LOGV(TAG, "GWM auth: sending 1003");
+            nextFrame.data.u8[0] = 2;
+            nextFrame.data.u8[1] = (ISOTP_FT_FIRST<<4);
+            nextFrame.data.u8[2] = 3;
             known = true;
         }
         else if (*data == 3u)
         {
             // Request seed1
-            nextFrame.data.u8[1] = 0x41u;
-            nextFrame.data.u8[2] = 0x3eu;
-            nextFrame.data.u8[3] = 0xabu;
-            nextFrame.data.u8[4] = 0x00u;
-            nextFrame.data.u8[5] = 0x0du;
-            nextFrame.FIR.B.DLC = 6u;
+            ESP_LOGV(TAG, "GWM auth: requesting seed1");
+            nextFrame.data.u8[2] = 0x41u;
+            nextFrame.data.u8[3] = 0x3eu;
+            nextFrame.data.u8[4] = 0xabu;
+            nextFrame.data.u8[5] = 0x00u;
+            nextFrame.data.u8[6] = 0x0du;
             known = true;
         }
     }
@@ -139,19 +141,23 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t frameType, u
             // Seed1 response
             uint32_t seed = (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4];
             uint32_t key = pass1(seed);
-            nextFrame.data.u8[1] = 0x42u;
-            nextFrame.data.u8[2] = key >> 24u;
-            nextFrame.data.u8[3] = key >> 16u;
-            nextFrame.data.u8[4] = key >> 8u;
-            nextFrame.data.u8[5] = key;
-            nextFrame.FIR.B.DLC = 6u;
+            std::stringstream sSeed, sKey;
+            sSeed << std::hex << seed;
+            sKey << std::hex << key;
+            ESP_LOGV(TAG, "GWM auth: seed1 received %s. Replying with key1 %s", sSeed.str().c_str(), sKey.str().c_str());
+            nextFrame.data.u8[2] = 0x42u;
+            nextFrame.data.u8[3] = key >> 24u;
+            nextFrame.data.u8[4] = key >> 16u;
+            nextFrame.data.u8[5] = key >> 8u;
+            nextFrame.data.u8[6] = key;
             known = true;
         }
         else if (*data == 0x42u)
         {
             // Seed1 accept, request seed2
-            nextFrame.data.u8[1] = 0x01u;
-            nextFrame.FIR.B.DLC = 2u;
+            ESP_LOGV(TAG, "GWM auth: key1 accepted, requesting seed2");
+            nextFrame.data.u8[0] = 2;
+            nextFrame.data.u8[2] = 0x01u;
             known = true;
         }
         else if (*data == 0x01u)
@@ -159,23 +165,27 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t frameType, u
             // Seed 2 response
             uint32_t seed = (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4];
             uint32_t key = pass2(seed);
-            nextFrame.data.u8[1] = 0x02u;
-            nextFrame.data.u8[2] = key >> 24u;
-            nextFrame.data.u8[3] = key >> 16u;
-            nextFrame.data.u8[4] = key >> 8u;
-            nextFrame.data.u8[5] = key;
-            nextFrame.FIR.B.DLC = 6u;
+            std::stringstream sSeed, sKey;
+            sSeed << std::hex << seed;
+            sKey << std::hex << key;
+            ESP_LOGV(TAG, "GWM auth: seed2 received %s. Replying with key2 %s", sSeed.str().c_str(), sKey.str().c_str());
+            nextFrame.data.u8[2] = 0x02u;
+            nextFrame.data.u8[3] = key >> 24u;
+            nextFrame.data.u8[4] = key >> 16u;
+            nextFrame.data.u8[5] = key >> 8u;
+            nextFrame.data.u8[6] = key;
             known = true;
         }
         else if (*data == 0x02u)
         {
             // Seed 2 accept, end session 1
-            nextFrame.data.u8[0] = (ISOTP_FT_FLOWCTRL<<4) + 1;
-            nextFrame.data.u8[1] = 0x01u;
-            nextFrame.data.u8[2] = 0xaau;
-            nextFrame.data.u8[3] = 0xffu;
-            nextFrame.data.u8[4] = 0x00u;
-            nextFrame.FIR.B.DLC = 5u;
+            ESP_LOGI(TAG, "GWM auth: key2 accepted, ending session 1");
+            nextFrame.data.u8[0] = 5;
+            nextFrame.data.u8[1] = (ISOTP_FT_FLOWCTRL<<4) + 1;
+            nextFrame.data.u8[2] = 0x01u;
+            nextFrame.data.u8[3] = 0xaau;
+            nextFrame.data.u8[4] = 0xffu;
+            nextFrame.data.u8[5] = 0x00u;
             known = true;
         }
     }
@@ -184,16 +194,18 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t frameType, u
         if (*data == 0x01u)
         {
             // Ack end session 1, end session 3
-            nextFrame.data.u8[0] = (ISOTP_FT_FLOWCTRL<<4) + 1;
-            nextFrame.data.u8[1] = 0x03u;
-            nextFrame.data.u8[2] = 0xaau;
-            nextFrame.data.u8[3] = 0xffu;
-            nextFrame.FIR.B.DLC = 4u;
+            ESP_LOGV(TAG, "GWM auth: session 1 ended, ending session 3");
+            nextFrame.data.u8[0] = 4;
+            nextFrame.data.u8[1] = (ISOTP_FT_FLOWCTRL<<4) + 1;
+            nextFrame.data.u8[2] = 0x03u;
+            nextFrame.data.u8[3] = 0xaau;
+            nextFrame.data.u8[4] = 0xffu;
             known = true;
         }
         else if (*data == 0x03u)
         {
             // Ack session 3
+            ESP_LOGV(TAG, "GWM auth: session 3 ended.");
             ESP_LOGI(TAG, "Gateway authentication complete");
         }
     }
