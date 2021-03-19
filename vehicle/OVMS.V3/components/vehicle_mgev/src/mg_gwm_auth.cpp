@@ -179,7 +179,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t frameType, u
         else if (*data == 0x02u)
         {
             // Seed 2 accept, end session 1
-            ESP_LOGI(TAG, "GWM auth: key2 accepted, ending session 1");
+            ESP_LOGV(TAG, "GWM auth: key2 accepted, ending session 1");
             nextFrame.data.u8[0] = 5;
             nextFrame.data.u8[1] = (ISOTP_FT_FLOWCTRL<<4) + 1;
             nextFrame.data.u8[2] = 0x01u;
