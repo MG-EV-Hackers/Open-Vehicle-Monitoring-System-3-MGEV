@@ -143,7 +143,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
             // Seed1 response
             uint32_t seed = (data[2] << 24) | (data[3] << 16) | (data[4] << 8) | data[5];
             uint32_t key = pass1(seed);
-            ESP_LOGV(TAG, "GWM auth: seed1 received %x. Replying with key1 %x", seed, key);
+            ESP_LOGV(TAG, "GWM auth: seed1 received %08x. Replying with key1 %08x", seed, key);
             nextFrame.data.u8[0] = (ISOTP_FT_SINGLE << 4) | 6;
             nextFrame.data.u8[1] = VEHICLE_POLL_TYPE_SECACCESS;            
             nextFrame.data.u8[2] = 0x42u;
@@ -167,7 +167,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
             // Seed 2 response
             uint32_t seed = (data[2] << 24) | (data[3] << 16) | (data[4] << 8) | data[5];
             uint32_t key = pass2(seed);
-            ESP_LOGV(TAG, "GWM auth: seed2 received %x. Replying with key2 %x", seed, key);
+            ESP_LOGV(TAG, "GWM auth: seed2 received %08x. Replying with key2 %08x", seed, key);
             nextFrame.data.u8[0] = (ISOTP_FT_SINGLE << 4) | 6;
             nextFrame.data.u8[1] = VEHICLE_POLL_TYPE_SECACCESS;            
             nextFrame.data.u8[2] = 0x02u;
