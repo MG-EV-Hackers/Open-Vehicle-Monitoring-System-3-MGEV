@@ -116,7 +116,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
         if (data[1] == 0x01)
         {
             // First session start, start another
-            ESP_LOGI(TAG, "GWM auth: sending 1003");
+            ESP_LOGV(TAG, "GWM auth: sending 1003");
             nextFrame.data.u8[0] = (ISOTP_FT_SINGLE << 4) | 2;
             nextFrame.data.u8[1] = VEHICLE_POLL_TYPE_OBDIISESSION;
             nextFrame.data.u8[2] = 3;
@@ -125,7 +125,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
         else if (data[1] == 0x03)
         {
             // Request seed1
-            ESP_LOGI(TAG, "GWM auth: requesting seed1");
+            ESP_LOGV(TAG, "GWM auth: requesting seed1");
             nextFrame.data.u8[0] = (ISOTP_FT_SINGLE << 4) | 6;
             nextFrame.data.u8[1] = VEHICLE_POLL_TYPE_SECACCESS;
             nextFrame.data.u8[2] = 0x41u;
@@ -143,7 +143,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
             // Seed1 response
             uint32_t seed = (data[2] << 24) | (data[3] << 16) | (data[4] << 8) | data[5];
             uint32_t key = pass1(seed);
-            ESP_LOGI(TAG, "GWM auth: seed1 received %x. Replying with key1 %x", seed, key);
+            ESP_LOGV(TAG, "GWM auth: seed1 received %x. Replying with key1 %x", seed, key);
             nextFrame.data.u8[0] = (ISOTP_FT_SINGLE << 4) | 6;
             nextFrame.data.u8[1] = VEHICLE_POLL_TYPE_SECACCESS;            
             nextFrame.data.u8[2] = 0x42u;
@@ -156,7 +156,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
         else if (data[1] == 0x42)
         {
             // Seed1 accept, request seed2
-            ESP_LOGI(TAG, "GWM auth: key1 accepted, requesting seed2");
+            ESP_LOGV(TAG, "GWM auth: key1 accepted, requesting seed2");
             nextFrame.data.u8[0] = (ISOTP_FT_SINGLE << 4) | 2;
             nextFrame.data.u8[1] = VEHICLE_POLL_TYPE_SECACCESS;
             nextFrame.data.u8[2] = 0x01u;
@@ -167,7 +167,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
             // Seed 2 response
             uint32_t seed = (data[2] << 24) | (data[3] << 16) | (data[4] << 8) | data[5];
             uint32_t key = pass2(seed);
-            ESP_LOGI(TAG, "GWM auth: seed2 received %x. Replying with key2 %x", seed, key);
+            ESP_LOGV(TAG, "GWM auth: seed2 received %x. Replying with key2 %x", seed, key);
             nextFrame.data.u8[0] = (ISOTP_FT_SINGLE << 4) | 6;
             nextFrame.data.u8[1] = VEHICLE_POLL_TYPE_SECACCESS;            
             nextFrame.data.u8[2] = 0x02u;
@@ -180,7 +180,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
         else if (data[1] == 0x02)
         {
             // Seed 2 accept, end session 1
-            ESP_LOGI(TAG, "GWM auth: key2 accepted, ending session 1");
+            ESP_LOGV(TAG, "GWM auth: key2 accepted, ending session 1");
             nextFrame.data.u8[0] = (ISOTP_FT_SINGLE << 4) | 5;
             nextFrame.data.u8[1] = VEHICLE_POLL_TYPE_ROUTINECONTROL;
             nextFrame.data.u8[2] = 0x01u;
@@ -195,7 +195,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
         if (data[1] == 0x01)
         {
             // Ack end session 1, end session 3
-            ESP_LOGI(TAG, "GWM auth: session 1 ended, ending session 3");
+            ESP_LOGV(TAG, "GWM auth: session 1 ended, ending session 3");
             nextFrame.data.u8[0] = (ISOTP_FT_SINGLE << 4) | 4;
             nextFrame.data.u8[1] = VEHICLE_POLL_TYPE_ROUTINECONTROL;
             nextFrame.data.u8[2] = 0x03u;
@@ -206,7 +206,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t serviceId, u
         else if (data[1] == 0x03)
         {
             // Ack session 3
-            ESP_LOGI(TAG, "GWM auth: session 3 ended.");
+            ESP_LOGV(TAG, "GWM auth: session 3 ended.");
             ESP_LOGI(TAG, "Gateway authentication complete");
         }
     }
