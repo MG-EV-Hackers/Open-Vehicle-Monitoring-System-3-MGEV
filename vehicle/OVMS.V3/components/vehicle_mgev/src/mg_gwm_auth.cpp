@@ -91,7 +91,7 @@ bool OvmsVehicleMgEv::StartAuthentication(canbus* currentBus)
         { .B = { 8, 0, CAN_no_RTR, CAN_frame_std, 0 } },
         gwmId,
         { .u8 = {
-            2, (ISOTP_FT_FIRST<<4), 1, 0, 0, 0, 0, 0,
+            2, (ISOTP_FT_FIRST<<4), 1, 0, 0, 0, 0, 0
         } }
     };
     return currentBus->Write(&authStart) != ESP_FAIL;
@@ -105,7 +105,7 @@ void OvmsVehicleMgEv::GwmAuthentication(canbus* currentBus, uint8_t frameType, u
         { .B = { 8, 0, CAN_no_RTR, CAN_frame_std, 0 } },
         gwmId,
         { .u8 = {
-            6, (ISOTP_FT_CONSECUTIVE<<4) + 7, 0, 0, 0, 0, 0, 0,
+            6, (ISOTP_FT_CONSECUTIVE<<4) + 7, 0, 0, 0, 0, 0, 0
         } }
     };
 
