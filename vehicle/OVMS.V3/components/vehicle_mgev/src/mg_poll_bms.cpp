@@ -179,8 +179,8 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 
                 // Save SOC for display
                 StandardMetrics.ms_v_bat_soc->SetValue(scaledSoc);
-                // Ideal range set to SoC percentage of 262 km (WLTP Range)
-                StandardMetrics.ms_v_bat_range_ideal->SetValue(262 * (scaledSoc / 100));
+                // Ideal range set to SoC percentage of ideal Range)
+                StandardMetrics.ms_v_bat_range_est->SetValue(StandardMetrics.ms_v_bat_range_ideal->AsFloat() / 1.08);
             }
             break;
         case bmsStatusPid:
@@ -197,11 +197,11 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
             // Need to adjust for New BMS on English Vehicles
             if (MyConfig.GetParamValueBool("xmg", "ukvehicle", true))
             {
-                StandardMetrics.ms_v_bat_range_est->SetValue(value);
+                StandardMetrics.ms_v_bat_range_ideal->SetValue(value);
             }
             else
             {
-                StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+                StandardMetrics.ms_v_bat_range_ideal->SetValue(value / 10.0);
             }
             break;
     }
