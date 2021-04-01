@@ -87,14 +87,17 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
 {
     std::string error;
     bool updatedbmu;
-    
+    bool ukvehicle;
+
     if (c.method == "POST") {
         updatedbmu = (c.getvar("updatedbmu") == "yes");
-        
+        ukvehicle = (c.getvar("ukvehicle") == "yes");
+
         if (error == "") {
           // store:
-          MyConfig.SetParamValueBool("xmg", "updatedbmu", updatedbmu);
-          
+            MyConfig.SetParamValueBool("xmg", "updatedbmu", updatedbmu);
+            MyConfig.SetParamValueBool("xmg", "ukvehicle", ukvehicle);
+
           c.head(200);
           c.alert("success", "<p class=\"lead\">MG ZS EV / MG5 feature configuration saved.</p>");
           MyWebServer.OutputHome(p, c);
@@ -108,6 +111,7 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
     } else {
         // read configuration:
         updatedbmu = MyConfig.GetParamValueBool("xmg", "updatedbmu", false);
+        ukvehicle = MyConfig.GetParamValueBool("xmg", "ukvehicle", false);
         c.head(200);
     }
     // generate form:
@@ -117,6 +121,8 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
     c.fieldset_start("General");
     c.input_checkbox("Updated BMU Firmware", "updatedbmu", updatedbmu,
       "<p>Select this if you have BMU Firmware later than Jan 2021</p>");
+    c.input_checkbox("British Vehicle", "ukvehicle", ukvehicle,
+      "<p>Select this if you have selected the above and vehicle is in the UK</p>");
     c.fieldset_end();
     c.print("<hr>");
     c.input_button("default", "Save");

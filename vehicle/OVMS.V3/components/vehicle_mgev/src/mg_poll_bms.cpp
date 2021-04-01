@@ -194,7 +194,15 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
             StandardMetrics.ms_v_bat_soh->SetValue(value / 100.0);
             break;
         case bmsRangePid:
-            StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+            // Need to adjust for New BMS on English Vehicles
+            if (MyConfig.GetParamValueBool("xmg", "ukvehicle", true))
+            {
+                StandardMetrics.ms_v_bat_range_est->SetValue(value);
+            }
+            else
+            {
+                StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+            }
             break;
     }
 }
