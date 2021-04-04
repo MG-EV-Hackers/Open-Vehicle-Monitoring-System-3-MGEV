@@ -78,8 +78,8 @@ void OvmsVehicleMgEv::IncomingVcuPoll(
         case vcuChargerConnectedPid:
             if (StandardMetrics.ms_v_charge_type->AsString() == "ccs")
             {
-                StandardMetrics.ms_v_door_chargeport->SetValue(1);
-                StandardMetrics.ms_v_charge_pilot->SetValue(1);
+                StandardMetrics.ms_v_door_chargeport->SetValue(true);
+                StandardMetrics.ms_v_charge_pilot->SetValue(true);
             }
             else
             {
