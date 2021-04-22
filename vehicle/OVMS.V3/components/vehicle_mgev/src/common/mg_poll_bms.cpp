@@ -160,6 +160,9 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
         case batteryVoltagePid:
             m_bat_pack_voltage->SetValue(value * 0.25);
             break;
+        case batteryResistancePid:
+            m_bat_resistance->SetValue(value / 2.0);
+            break;            
         case batterySoCPid:
             {
                 // Get raw value to display on Charging Metrics Page
@@ -183,19 +186,54 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 StandardMetrics.ms_v_bat_range_ideal->SetValue(262 * (scaledSoc / 100));
             }
             break;
+        case batteryErrorPid:
+            m_bat_error->SetValue(data[0]);
+            break;            
         case bmsStatusPid:
             SetBmsStatus(data[0]);
             break;
         case batteryCoolantTempPid:
             // Temperature is half degrees from -40C
-            StandardMetrics.ms_v_bat_temp->SetValue(data[0] * 0.5 - 40.0);
+            m_bat_coolant_temp->SetValue(data[0] * 0.5 - 40.0);
             break;
+        case batteryTempPid:
+            // Temperature is half degrees from -40C
+            StandardMetrics.ms_v_bat_temp->SetValue(data[0] * 0.5 - 40.0);
+            break;            
         case batterySoHPid:
             StandardMetrics.ms_v_bat_soh->SetValue(value / 100.0);
             break;
         case bmsRangePid:
             StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
             break;
+        case bmsMaxCellVoltagePid:
+            m_bms_max_cell_voltage->SetValue(value / 1000.0);
+            break;
+        case bmsMinCellVoltagePid:
+            m_bms_min_cell_voltage->SetValue(value / 1000.0);
+            break;     
+        case bmsTimePid:     
+            // Will get answer in 2 frames. 1st frame will have year month date in data[0], data[1] and data[2], length = 3 and remain = 3.
+            // 2nd frame will have hour minute second in data[0], data[1] and data[2], length 3 and remain 0
+            if (remain > 0)
+            {
+                m_bmsTimeTemp = OvmsVehicleMgEv::IntToString(data[2], 2, "0") + "/" + OvmsVehicleMgEv::IntToString(data[1], 2, "0") + "/" + OvmsVehicleMgEv::IntToString(data[0], 2, "0") + " ";
+            }
+            else
+            {
+                m_bmsTimeTemp += OvmsVehicleMgEv::IntToString(data[0], 2, "0") + ":" + OvmsVehicleMgEv::IntToString(data[1], 2, "0") + ":" + OvmsVehicleMgEv::IntToString(data[2], 2, "0");
+                m_bms_time->SetValue(m_bmsTimeTemp);
+            }
+            break;    
+        case bmsSystemMainRelayBPid:
+            m_bms_main_relay_b->SetValue(data[0]);
+            break;
+        case bmsSystemMainRelayGPid:
+            m_bms_main_relay_g->SetValue(data[0]);
+            break;
+        case bmsSystemMainRelayPPid:     
+            m_bms_main_relay_p->SetValue(data[0]);                          
+            break;            
     }
 }
 
@@ -219,7 +257,7 @@ void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
             if (StandardMetrics.ms_v_charge_inprogress->AsBool() )
             {
                 StandardMetrics.ms_v_charge_type->SetValue("not charging");
-                if (StandardMetrics.ms_v_bat_soc->AsFloat() >= 97.0)
+                if (StandardMetrics.ms_v_bat_soc->AsFloat() >= BMSDoDLimits[MyConfig.GetParamValueInt("xmg", "bms.dod.version", DEFAULT_BMS_DOD_VERSION)].Upper)
                 {
                     StandardMetrics.ms_v_charge_state->SetValue("done");
                     StandardMetrics.ms_v_charge_inprogress->SetValue(false);
@@ -229,29 +267,17 @@ void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
                     StandardMetrics.ms_v_charge_state->SetValue("stopped");
                     StandardMetrics.ms_v_charge_inprogress->SetValue(false);
                 }
-            } 
+            }           
             break;
     }
 }
 
 float OvmsVehicleMgEv::calculateSoc(uint16_t value)
 {
-    int lowerlimit;
-    int upperlimit;
+    int BMSVersion = MyConfig.GetParamValueInt("xmg", "bms.dod.version", DEFAULT_BMS_DOD_VERSION);
+    float lowerlimit = BMSDoDLimits[BMSVersion].Lower*10;
+    float upperlimit = BMSDoDLimits[BMSVersion].Upper*10;
     
-    // Setup upper and lower limits from selection on features page
-    if (MyConfig.GetParamValueBool("xmg", "updatedbmu", true))
-    {
-        //New BMU firmware DoD range 25 - 940
-        lowerlimit = 25;
-        upperlimit = 940;
-    }
-    else
-    {
-        //Original BMU firmware DoD range 60 - 970
-        lowerlimit = 60;
-        upperlimit = 970;
-    }
     // Calculate SOC from upper and lower limits
     return (value - lowerlimit) * 100.0f / (upperlimit - lowerlimit);
 }
