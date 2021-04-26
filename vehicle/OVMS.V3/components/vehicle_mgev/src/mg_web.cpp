@@ -89,20 +89,23 @@ void OvmsVehicleMgEv::WebDeInit()
 void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
 {
     std::string error;
-    bool updatedbmu;
+    std::string bmstype;
+    int bmsval;
     
     if (c.method == "POST") {
-        updatedbmu = (c.getvar("updatedbmu") == "yes");
-        
+        bmstype = c.getvar("bmstype");
+        bmsval = atoi(bmstype.c_str());
+
         if (error == "") {
-          // store:
-          MyConfig.SetParamValueBool("xmg", "updatedbmu", updatedbmu);
-          
-          c.head(200);
-          c.alert("success", "<p class=\"lead\">MG ZS EV / MG5 feature configuration saved.</p>");
-          MyWebServer.OutputHome(p, c);
-          c.done();
-          return;
+            // store:
+            MyConfig.SetParamValueInt("xmg", "bmsval", bmsval);
+            MyConfig.SetParamValue("xmg", "bmstype", bmstype);
+
+            c.head(200);
+            c.alert("success", "<p class=\"lead\">MG ZS EV / MG5 feature configuration saved.</p>");
+            MyWebServer.OutputHome(p, c);
+            c.done();
+            return;
         }
         // output error, return to form:
         error = "<p class=\"lead\">Error!</p><ul class=\"errorlist\">" + error + "</ul>";
@@ -110,16 +113,21 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
         c.alert("danger", error.c_str());
     } else {
         // read configuration:
-        updatedbmu = MyConfig.GetParamValueBool("xmg", "updatedbmu", false);
+        bmsval = MyConfig.GetParamValueInt("xmg", "bmsval",0);
+        bmstype = MyConfig.GetParamValue("xmg", "bmstype", "0");
+        
         c.head(200);
     }
     // generate form:
     c.panel_start("primary", "MG ZS EV / MG5 feature configuration");
     c.form_start(p.uri);
-
-    c.fieldset_start("General");
-    c.input_checkbox("Updated BMU Firmware", "updatedbmu", updatedbmu,
-      "<p>Select this if you have BMU Firmware later than Jan 2021</p>");
+    
+    c.fieldset_start("BMS Firmware Status");
+    c.input_radio_start("BMS Type", "bmstype");
+    c.input_radio_option("bmstype", "Original BMS Firmware", "0",  bmsval == 0);
+    c.input_radio_option("bmstype", "BMS Firmware A01", "1", bmsval == 1);
+    c.input_radio_option("bmstype", "BMS Firmware EU1", "2", bmsval == 2);
+    c.input_radio_end("");
     c.fieldset_end();
     c.print("<hr>");
     c.input_button("default", "Save");
@@ -127,6 +135,7 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
     c.panel_end();
     c.done();
 }
+
 
 /**
  * WebCfgBattery: configure battery parameters (URL /xmg/battery)
