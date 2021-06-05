@@ -54,6 +54,7 @@ void OvmsVehicleMgEv::ProcessBatteryStats(int index, uint8_t* data, uint16_t rem
     // The stats are per block rather than per cell, but we'll record them in cells
     // Rather than cache all of the data as it's split over two frames, just cache the one
     // byte that we need
+    StandardMetrics.ms_v_bat_pack_vstddev->SetValue(StandardMetrics.ms_v_bat_pack_vmax->AsFloat() - StandardMetrics.ms_v_bat_pack_vmin->AsFloat());
     if (remain)
     {
         uint16_t vmin = (data[0] << 8 | data[1]);
@@ -182,8 +183,9 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 
                 // Save SOC for display
                 StandardMetrics.ms_v_bat_soc->SetValue(scaledSoc);
-                // Ideal range set to SoC percentage of WLTP Range
-                StandardMetrics.ms_v_bat_range_ideal->SetValue(WLTP_RANGE * (scaledSoc / 100));
+                // Ideal range set to SoC percentage of 262 km (WLTP Range)
+                StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.92);
+                StandardMetrics.ms_v_bat_range_ideal->SetValue((274 * (scaledSoc / 100)));
             }
             break;
         case batteryErrorPid:
@@ -204,7 +206,7 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
             StandardMetrics.ms_v_bat_soh->SetValue(value / 100.0);
             break;
         case bmsRangePid:
-            StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+            StandardMetrics.ms_v_bat_range_full->SetValue(value);
             break;
         case bmsMaxCellVoltagePid:
             m_bms_max_cell_voltage->SetValue(value / 1000.0);
@@ -278,6 +280,20 @@ float OvmsVehicleMgEv::calculateSoc(uint16_t value)
     float lowerlimit = BMSDoDLimits[BMSVersion].Lower*10;
     float upperlimit = BMSDoDLimits[BMSVersion].Upper*10;
     
+    // Setup upper and lower limits from selection on features page
+    if (MyConfig.GetParamValueBool("xmg", "updatedbmu", true))
+    {
+        //New BMU firmware DoD range 5 - 930
+        lowerlimit = 5;
+        upperlimit = 930;
+    }
+    else
+    {
+        //Original BMU firmware DoD range 60 - 970
+        lowerlimit = 60;
+        upperlimit = 970;
+    }
+
     // Calculate SOC from upper and lower limits
     return (value - lowerlimit) * 100.0f / (upperlimit - lowerlimit);
 }
