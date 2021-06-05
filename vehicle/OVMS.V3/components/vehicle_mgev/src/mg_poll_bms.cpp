@@ -183,9 +183,32 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 
                 // Save SOC for display
                 StandardMetrics.ms_v_bat_soc->SetValue(scaledSoc);
-                // Ideal range set to SoC percentage of 262 km (WLTP Range)
-                StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.92);
-                StandardMetrics.ms_v_bat_range_ideal->SetValue((274 * (scaledSoc / 100)));
+                // Ideal range set to SoC percentage of 274 km
+                switch (MyConfig.GetParamValueInt("xmg", "bmsval"))
+                    {
+                    /*case 0:
+                        //Original BMS firmware
+                        //StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+                        StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.92);
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue(274 * (scaledSoc / 100));
+                        break; */
+                    case 1:
+                        //New BMS firmware A01
+                        StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 9.2);
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue((274 * (scaledSoc / 100)) * 10.0);
+                        break;
+                    case 2:
+                        //New BMS firmware EU1
+                        StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.92);
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue((274 * (scaledSoc / 100)) * 1.0);
+                        break;
+                    default:
+                        //Original BMS firmware
+                        //StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+                        StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.92);
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue(274 * (scaledSoc / 100));
+                        break;
+                    }
             }
             break;
         case batteryErrorPid:
@@ -269,7 +292,7 @@ void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
                 {
                     StandardMetrics.ms_v_charge_state->SetValue("stopped");
                 }
-            } 
+            }
             break;
     }
 }
@@ -281,17 +304,28 @@ float OvmsVehicleMgEv::calculateSoc(uint16_t value)
     float upperlimit = BMSDoDLimits[BMSVersion].Upper*10;
     
     // Setup upper and lower limits from selection on features page
-    if (MyConfig.GetParamValueBool("xmg", "updatedbmu", true))
+    switch (MyConfig.GetParamValueInt("xmg", "bmsval"))
     {
-        //New BMU firmware DoD range 5 - 930
-        lowerlimit = 5;
-        upperlimit = 930;
-    }
-    else
-    {
-        //Original BMU firmware DoD range 60 - 970
-        lowerlimit = 60;
-        upperlimit = 970;
+        /*case 0:
+            //Original BMU firmware DoD range 60 - 970
+            lowerlimit = 60;
+            upperlimit = 970;
+            break;*/
+        case 1:
+            //New BMS firmware A01
+            lowerlimit = 15;
+            upperlimit = 940;
+            break;
+        case 2:
+            //New BMS firmware EU1
+            lowerlimit = 5;
+            upperlimit = 930;
+            break;
+        default:
+            //Original BMS firmware DoD range 60 - 970
+            lowerlimit = 60;
+            upperlimit = 970;
+            break;
     }
 
     // Calculate SOC from upper and lower limits
