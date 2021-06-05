@@ -49,24 +49,11 @@
 #define GWM_RETRY_CHECK_STATE_TIMEOUT 5 //seconds. Number of seconds to wait before retry state check.
 #define CAR_UNRESPONSIVE_THRESHOLD 3 //seconds. If reaches this threshold, GWM state will change back to Unknown.
 #define CHARGING_THRESHOLD 12.9 //Volts. If voltage is lower than this, we say 1. 12V battery is not charging and 2. we should sleep OVMS to avoid draining battery too low
-#define DEFAULT_BMS_VERSION 1 //Corresponding to the BMSDoDLimits array element
 #define WLTP_RANGE 263.0 //km
 #define TRANSITION_TIMEOUT 50 //s. Number of seconds after 12V goes below CHARGING_THRESHOLD to stay in current state before going to sleep.
 
 namespace 
 {
-
-typedef struct
-{
-    float Lower;
-    float Upper;
-} BMSDoDLimits_t;
-
-const BMSDoDLimits_t BMSDoDLimits[] = 
-{
-    {6, 97}, //Pre Jan 2021 BMS firmware DoD range 6 - 97
-    {2.5, 94} //Jan 2021 BMS firmware DoD range 2.5 - 94
-};
 
 typedef struct{
        int fromPercent;

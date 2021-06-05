@@ -194,8 +194,8 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                         break; */
                     case 1:
                         //New BMS firmware A01
-                        StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 9.2);
-                        StandardMetrics.ms_v_bat_range_ideal->SetValue((274 * (scaledSoc / 100)) * 10.0);
+                        StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.9);
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue((274 * (scaledSoc / 100)) * 1.0);
                         break;
                     case 2:
                         //New BMS firmware EU1
@@ -205,8 +205,8 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                     default:
                         //Original BMS firmware
                         //StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
-                        StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.92);
-                        StandardMetrics.ms_v_bat_range_ideal->SetValue(274 * (scaledSoc / 100));
+                        StandardMetrics.ms_v_bat_range_est->SetValue((263 * (scaledSoc / 100)) * 0.92);
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue(263 * (scaledSoc / 100));
                         break;
                     }
             }
@@ -299,9 +299,8 @@ void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
 
 float OvmsVehicleMgEv::calculateSoc(uint16_t value)
 {
-    int BMSVersion = MyConfig.GetParamValueInt("xmg", "bms.version", DEFAULT_BMS_VERSION);
-    float lowerlimit = BMSDoDLimits[BMSVersion].Lower*10;
-    float upperlimit = BMSDoDLimits[BMSVersion].Upper*10;
+    int lowerlimit;
+    int upperlimit;
     
     // Setup upper and lower limits from selection on features page
     switch (MyConfig.GetParamValueInt("xmg", "bmsval"))

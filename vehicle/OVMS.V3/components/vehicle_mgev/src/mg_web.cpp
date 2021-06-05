@@ -65,7 +65,7 @@ void OvmsVehicleMgEv::WebInit()
 {
     // vehicle menu:
     MyWebServer.RegisterPage("/xmg/features", "Features", WebCfgFeatures, PageMenu_Vehicle, PageAuth_Cookie);
-    MyWebServer.RegisterPage("/xmg/battery",  "Battery config",   WebCfgBattery, PageMenu_Vehicle, PageAuth_Cookie);
+    MyWebServer.RegisterPage("/xmg/battery",  "Battery config", WebCfgBattery, PageMenu_Vehicle, PageAuth_Cookie);
     //MyWebServer.RegisterPage("/bms/cellmon", "BMS cell monitor", OvmsWebServer::HandleBmsCellMonitor, PageMenu_Vehicle, PageAuth_Cookie);
     MyWebServer.RegisterPage("/bms/metrics_charger", "Charging Metrics", WebDispChgMetrics, PageMenu_Vehicle, PageAuth_Cookie);
 }
@@ -86,22 +86,6 @@ void OvmsVehicleMgEv::WebDeInit()
 void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
 {
     std::string error;
-    //When we have more versions, need to change this to int and change from checkbox to select
-    bool updatedbms = DEFAULT_BMS_VERSION == 1 ? true : false;
-    
-    if (c.method == "POST") {
-        updatedbms = (c.getvar("updatedbms") == "yes");
-        
-        if (error == "") {
-          // store:
-          //"Updated" BMS is version 1 (corresponding to BMSDoDLimits array element). "Original" BMS is version 0 (corresponding to BMSDoDLimits array element)
-          MyConfig.SetParamValueInt("xmg", "bms.version", updatedbms ? 1 : 0);
-          
-          c.head(200);
-          c.alert("success", "<p class=\"lead\">MG ZS EV / MG5 feature configuration saved.</p>");
-          MyWebServer.OutputHome(p, c);
-          c.done();
-          return;
     std::string bmstype;
     int bmsval;
     
@@ -119,29 +103,21 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
             MyWebServer.OutputHome(p, c);
             c.done();
             return;
-
-        switch (MyConfig.GetParamValueInt("xmg", "bms.version", DEFAULT_BMS_VERSION))
-        {
-          case 0:
-            //"Updated" BMS is version 0 (corresponding to BMSDoDLimits array element)
-            updatedbms = false;
-            break;
-          case 1:
-            //"Original" BMS is version 1 (corresponding to BMSDoDLimits array element)
-            updatedbms = true;
-            break;
         }
-            
+        // output error, return to form:
+        error = "<p class=\"lead\">Error!</p><ul class=\"errorlist\">" + error + "</ul>";
+        c.head(400);
+        c.alert("danger", error.c_str());
+    } else {
+        // read configuration:
         bmsval = MyConfig.GetParamValueInt("xmg", "bmsval",0);
         bmstype = MyConfig.GetParamValue("xmg", "bmstype", "0");
         
-
-
-
-    c.fieldset_start("General");
-    //When we have more versions, need to change this to select and updatedbms to int
-    c.input_checkbox("Updated BMS Firmware", "updatedbms", updatedbms,
-      "<p>Select this if you have BMS Firmware later than Jan 2021</p>");
+        c.head(200);
+    }
+    // generate form:
+    c.panel_start("primary", "MG ZS EV / MG5 feature configuration");
+    c.form_start(p.uri);
     
     c.fieldset_start("BMS Firmware Status");
     c.input_radio_start("BMS Type", "bmstype");
@@ -149,10 +125,13 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
     c.input_radio_option("bmstype", "BMS Firmware A01", "1", bmsval == 1);
     c.input_radio_option("bmstype", "BMS Firmware EU1", "2", bmsval == 2);
     c.input_radio_end("");
-
+    c.fieldset_end();
+    c.print("<hr>");
+    c.input_button("default", "Save");
+    c.form_end();
+    c.panel_end();
+    c.done();
 }
-
-
 /**
  * WebCfgBattery: configure battery parameters (URL /xmg/battery)
  */
@@ -589,4 +568,5 @@ void OvmsVehicleMgEv::WebDispChgMetrics(PageEntry_t &p, PageContext_t &c)
   PAGE_HOOK("body.post");
   c.done();
 }
+            
 #endif //CONFIG_OVMS_COMP_WEBSERVER
