@@ -90,6 +90,7 @@ class OvmsVehicleMgEv : public OvmsVehicle
     OvmsMetricFloat *m_vcu_dcdc_input_current, *m_vcu_dcdc_input_voltage, *m_vcu_dcdc_output_current, *m_vcu_dcdc_output_voltage;
     OvmsMetricFloat *m_vcu_dcdc_temp;
     OvmsMetricFloat* m_soc_raw;
+    OvmsMetricFloat* m_range_raw;
     OvmsMetricFloat* m_motor_coolant_temp;
     OvmsMetricFloat* m_motor_torque;
     OvmsMetricBool* m_radiator_fan;
@@ -225,7 +226,9 @@ class OvmsVehicleMgEv : public OvmsVehicle
 
     int calcMinutesRemaining(int target_soc, charging_profile charge_steps[]);
     bool soc_limit_reached;
-    bool range_limit_reached;   
+    bool range_limit_reached;
+    
+    virtual void CalculateEfficiency();
 
     // mg_configuration.cpp
     int CanInterface();

@@ -169,6 +169,7 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 // Get raw value to display on Charging Metrics Page
                 m_soc_raw->SetValue(value / 10.0f);
                 auto scaledSoc = calculateSoc(value);
+                
                 if (StandardMetrics.ms_v_charge_inprogress->AsBool())
                 {
                     if (scaledSoc < 99.5)
@@ -183,6 +184,7 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 
                 // Save SOC for display
                 StandardMetrics.ms_v_bat_soc->SetValue(scaledSoc);
+                
                 // Ideal range set to SoC percentage of 274 km
                 switch (MyConfig.GetParamValueInt("xmg", "bmsval"))
                     {
@@ -228,10 +230,12 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
         case batterySoHPid:
             StandardMetrics.ms_v_bat_soh->SetValue(value / 100.0);
             break;
-        case bmsRangePid:
-            StandardMetrics.ms_v_bat_range_full->SetValue(value);
+       case bmsRangePid:
+            m_range_raw->SetValue(value);
+            //StandardMetrics.ms_v_bat_range_full->SetValue(value);
             break;
-        case bmsMaxCellVoltagePid:
+
+ case bmsMaxCellVoltagePid:
             m_bms_max_cell_voltage->SetValue(value / 1000.0);
             break;
         case bmsMinCellVoltagePid:
