@@ -91,6 +91,7 @@ class OvmsVehicleMgEv : public OvmsVehicle
     OvmsMetricFloat *m_vcu_dcdc_temp;
     OvmsMetricFloat* m_soc_raw;
     OvmsMetricFloat* m_range_raw;
+    OvmsMetricFloat* m_watt_hour_raw;
     OvmsMetricFloat* m_motor_coolant_temp;
     OvmsMetricFloat* m_motor_torque;
     OvmsMetricBool* m_radiator_fan;
@@ -202,7 +203,8 @@ class OvmsVehicleMgEv : public OvmsVehicle
     // A temporary store for the VIN
     char m_vin[18];
 	  // Store cumulative energy charged
-    float mg_cum_energy_charge_wh;		
+    float mg_cum_energy_charge_wh;
+    float consumpRange;
     // Set to true when send tester present to GWM and set to false when response is received
     bool m_WaitingGWMTesterPresentResponse = false;
     // Count number of times a tester present message is not responded by the GWM
@@ -228,7 +230,7 @@ class OvmsVehicleMgEv : public OvmsVehicle
     bool soc_limit_reached;
     bool range_limit_reached;
     
-    virtual void CalculateEfficiency();
+    virtual void calculateEfficiency();
 
     // mg_configuration.cpp
     int CanInterface();
