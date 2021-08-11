@@ -443,6 +443,23 @@ void OvmsVehicleMgEv::calculateEfficiency()
     
     }
 
+OvmsVehicle::vehicle_command_t OvmsVehicleMgEv::CommandHomelink(int button, int durationms)
+  {
+  ESP_LOGI(TAG, "CommandHomelink");
+  if (button == 0)
+    {
+        StringWriter res;
+            MyScripts.DuktapeEvalNoResult("abrp.send(1)", &res);
+    }
+  if (button == 1)
+    {
+        StringWriter res;
+            MyScripts.DuktapeEvalNoResult("abrp.send(0)", &res);
+    }
+  return NotImplemented;
+  }
+
+
 //Called by OVMS when a wake up command is requested
 void OvmsVehicleMgEv::WakeUp(void* self)
 {
