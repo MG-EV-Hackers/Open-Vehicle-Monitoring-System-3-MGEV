@@ -91,6 +91,8 @@ void OvmsVehicleVWeUp::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
     nmap["cell_interval_chg"] = c.getvar("cell_interval_chg");
     nmap["cell_interval_awk"] = c.getvar("cell_interval_awk");
     nmap["bat.soh.source"] = c.getvar("bat.soh.source");
+    nmap["ctp.maxpower"] = c.getvar("ctp_maxpower");
+    nmap["ctp.soclimit"] = c.getvar("ctp_soclimit");
 
     // check:
     if (nmap["modelyear"] != "")
@@ -175,6 +177,19 @@ void OvmsVehicleVWeUp::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
   c.input_checkbox("Enable CAN writes", "canwrite", strtobool(nmap["canwrite"]),
     "<p>Controls overall CAN write access, OBD2 and climate control depends on this.</p>"
     "<p>This parameter can also be set in the app under FEATURES 15.</p>");
+  c.fieldset_end();
+
+  c.fieldset_start("Charge Time Prediction");
+  c.input_slider("Default power limit", "ctp_maxpower", 3, "kW",
+    -1, nmap["ctp.maxpower"].empty() ? 0 : std::stof(nmap["ctp.maxpower"]),
+    0, 0, 30, 0.1,
+    "<p>Used while not charging, default 0 = unlimited (except by car).</p>"
+    "<p>Note: this needs to be the power level at the battery, i.e. after losses.</p>"
+    "<p>Typical values: 6.5 kW for 2-phase charging, 3.2 kW for 1-phase, 2 kW for ICCB/Schuko.</p>");
+  c.input_slider("Default SOC limit", "ctp_soclimit", 3, "%",
+    -1, nmap["ctp.soclimit"].empty() ? 80 : std::stof(nmap["ctp.soclimit"]),
+    80, 10, 100, 5,
+    "<p>Used if no timer mode limits are available, i.e. without OBD connection or without timer schedule.</p>");
   c.fieldset_end();
 
   c.fieldset_start("Battery Health", "needs-con-obd");
@@ -574,4 +589,91 @@ void OvmsVehicleVWeUp::WebDispChgMetrics(PageEntry_t &p, PageContext_t &c)
 
   PAGE_HOOK("body.post");
   c.done();
+}
+
+
+/**
+ * GetDashboardConfig: VW eUp specific dashboard setup
+ */
+void OvmsVehicleVWeUp::GetDashboardConfig(DashboardConfig& cfg)
+{
+  // Get model specific battery voltage range:
+  int cells = (vweup_modelyear > 2019) ? 84 : 102;
+  float
+    bat_volt_max      = cells * 4.2,
+    bat_volt_yellow   = cells * 3.5,
+    bat_volt_red      = cells * 3.4,
+    bat_volt_min      = cells * 3.3;
+
+  StringWriter buf;
+  buf.printf(
+    "yAxis: [{"
+      // Speed:
+      "min: 0, max: 140,"
+      "plotBands: ["
+        "{ from: 0, to: 100, className: 'green-band' },"
+        "{ from: 100, to: 120, className: 'yellow-band' },"
+        "{ from: 120, to: 140, className: 'red-band' }]"
+    "},{"
+      // Voltage:
+      "min: %.0f, max: %.0f,"
+      "plotBands: ["
+        "{ from: %.0f, to: %.1f, className: 'red-band' },"
+        "{ from: %.1f, to: %.1f, className: 'yellow-band' },"
+        "{ from: %.1f, to: %.0f, className: 'green-band' }]"
+    "},{"
+      // SOC:
+      "min: 0, max: 100,"
+      "plotBands: ["
+        "{ from: 0, to: 12.5, className: 'red-band' },"
+        "{ from: 12.5, to: 25, className: 'yellow-band' },"
+        "{ from: 25, to: 100, className: 'green-band' }]"
+    "},{"
+      // Efficiency:
+      "min: 0, max: 300,"
+      "plotBands: ["
+        "{ from: 0, to: 150, className: 'green-band' },"
+        "{ from: 150, to: 250, className: 'yellow-band' },"
+        "{ from: 250, to: 300, className: 'red-band' }]"
+    "},{"
+      // Power:
+      "min: -40, max: 80,"
+      "plotBands: ["
+        "{ from: -40, to: 0, className: 'violet-band' },"
+        "{ from: 0, to: 40, className: 'green-band' },"
+        "{ from: 40, to: 60, className: 'yellow-band' },"
+        "{ from: 60, to: 80, className: 'red-band' }]"
+    "},{"
+      // Charger temperature:
+      "min: 20, max: 80, tickInterval: 20,"
+      "plotBands: ["
+        "{ from: 20, to: 65, className: 'normal-band border' },"
+        "{ from: 65, to: 80, className: 'red-band border' }]"
+    "},{"
+      // Battery temperature:
+      "min: -15, max: 65, tickInterval: 25,"
+      "plotBands: ["
+        "{ from: -15, to: 0, className: 'red-band border' },"
+        "{ from: 0, to: 50, className: 'normal-band border' },"
+        "{ from: 50, to: 65, className: 'red-band border' }]"
+    "},{"
+      // Inverter temperature:
+      "min: 20, max: 80, tickInterval: 20,"
+      "plotBands: ["
+        "{ from: 20, to: 70, className: 'normal-band border' },"
+        "{ from: 70, to: 80, className: 'red-band border' }]"
+    "},{"
+      // Motor temperature:
+      "min: 50, max: 125, tickInterval: 25,"
+      "plotBands: ["
+        "{ from: 50, to: 110, className: 'normal-band border' },"
+        "{ from: 110, to: 125, className: 'red-band border' }]"
+    "}]",
+    bat_volt_min, bat_volt_max,
+    bat_volt_min, bat_volt_red,
+    bat_volt_red, bat_volt_yellow,
+    bat_volt_yellow, bat_volt_max
+  );
+
+  cfg.gaugeset1 = buf;
 }

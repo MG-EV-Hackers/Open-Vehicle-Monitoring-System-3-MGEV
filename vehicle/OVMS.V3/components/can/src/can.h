@@ -307,7 +307,7 @@ class canbus : public pcp, public InternalRamAllocated
     virtual esp_err_t Write(const CAN_frame_t* p_frame, TickType_t maxqueuewait=0);
     virtual esp_err_t WriteExtended(uint32_t id, uint8_t length, uint8_t *data, TickType_t maxqueuewait=0);
     virtual esp_err_t WriteStandard(uint16_t id, uint8_t length, uint8_t *data, TickType_t maxqueuewait=0);
-    virtual bool AsynchronousInterruptHandler(CAN_frame_t* frame, bool* frameReceived);
+    virtual bool AsynchronousInterruptHandler(CAN_frame_t* frame, uint32_t* framesReceived);
     virtual void TxCallback(CAN_frame_t* frame, bool success);
 
   protected:
@@ -329,12 +329,15 @@ class canbus : public pcp, public InternalRamAllocated
     CAN_frame_t m_tx_frame;       // saved copy of last TX frame to be used in txcallback
     uint32_t m_status_chksum;
     uint32_t m_watchdog_timer;
+    uint32_t m_state;             // state bitset
     QueueHandle_t m_txqueue;
     int m_busnumber;
 
   protected:
     dbcfile *m_dbcfile;
   };
+
+#define CAN_M_STATE_TX_BUF_OCCUPIED   BIT(0) // transmit buffer is in use
 
 ////////////////////////////////////////////////////////////////////////
 // can - the CAN system controller
