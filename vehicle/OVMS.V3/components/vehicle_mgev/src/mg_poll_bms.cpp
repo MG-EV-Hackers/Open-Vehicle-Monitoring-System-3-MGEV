@@ -331,12 +331,12 @@ float OvmsVehicleMgEv::calculateSoc(uint16_t value)
             upperlimit = 970;
             break;*/
         case 1:
-            //New BMS firmware A01
+            //New BMS firmware A0*
             lowerlimit = 15;
             upperlimit = 940;
             break;
         case 2:
-            //New BMS firmware EU1
+            //New BMS firmware EU*
             lowerlimit = 5;
             upperlimit = 930;
             break;

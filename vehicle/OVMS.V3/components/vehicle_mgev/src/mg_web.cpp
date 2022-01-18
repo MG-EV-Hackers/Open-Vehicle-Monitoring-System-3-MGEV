@@ -122,8 +122,8 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
     c.fieldset_start("BMS Firmware Status");
     c.input_radio_start("BMS Type", "bmstype");
     c.input_radio_option("bmstype", "Original BMS Firmware", "0",  bmsval == 0);
-    c.input_radio_option("bmstype", "BMS Firmware A01", "1", bmsval == 1);
-    c.input_radio_option("bmstype", "BMS Firmware EU1", "2", bmsval == 2);
+    c.input_radio_option("bmstype", "BMS Firmware A0*", "1", bmsval == 1);
+    c.input_radio_option("bmstype", "BMS Firmware EU*", "2", bmsval == 2);
     c.input_radio_end("");
     c.fieldset_end();
     c.print("<hr>");
