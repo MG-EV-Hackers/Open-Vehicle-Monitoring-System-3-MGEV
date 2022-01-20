@@ -54,6 +54,7 @@ void OvmsVehicleMgEv::ProcessBatteryStats(int index, uint8_t* data, uint16_t rem
     // The stats are per block rather than per cell, but we'll record them in cells
     // Rather than cache all of the data as it's split over two frames, just cache the one
     // byte that we need
+    StandardMetrics.ms_v_bat_pack_vstddev->SetValue(StandardMetrics.ms_v_bat_pack_vmax->AsFloat() - StandardMetrics.ms_v_bat_pack_vmin->AsFloat());
     if (remain)
     {
         uint16_t vmin = (data[0] << 8 | data[1]);
@@ -168,9 +169,12 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 // Get raw value to display on Charging Metrics Page
                 m_soc_raw->SetValue(value / 10.0f);
                 auto scaledSoc = calculateSoc(value);
+//if to correct rounding
+                if(scaledSoc>=99.2)scaledSoc=100.0;
+                
                 if (StandardMetrics.ms_v_charge_inprogress->AsBool())
                 {
-                    if (scaledSoc < 99.5)
+                    if (scaledSoc < 99.1)
                     {
                         StandardMetrics.ms_v_charge_state->SetValue("charging");
                     }
@@ -182,8 +186,46 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 
                 // Save SOC for display
                 StandardMetrics.ms_v_bat_soc->SetValue(scaledSoc);
-                // Ideal range set to SoC percentage of WLTP Range
-                StandardMetrics.ms_v_bat_range_ideal->SetValue(WLTP_RANGE * (scaledSoc / 100));
+                
+                // Setup Calculates for Efficient Range
+                    float batTemp = StandardMetrics.ms_v_bat_temp->AsFloat();
+                    float effSoh = StandardMetrics.ms_v_bat_soh->AsFloat();
+                float kmPerKwh = 1000/(consumpRange*59 + consumpRange) / 60;
+                m_watt_hour_raw->SetValue(kmPerKwh);
+                    
+                if(kmPerKwh<5.63)kmPerKwh=5.63;
+                if(kmPerKwh>7.5)kmPerKwh=7.5;
+                if(batTemp>20)batTemp=20;
+                    
+                
+                // Ideal range set to SoC percentage of 274 km
+                switch (MyConfig.GetParamValueInt("xmg", "bmsval"))
+                    {
+                    /*case 0:
+                        //Original BMS firmware
+                        //StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+                        StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.92);
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue(274 * (scaledSoc / 100));
+                        break; */
+                    case 1:
+                        //New BMS firmware A01
+                        StandardMetrics.ms_v_bat_range_est->SetValue(42.5*((kmPerKwh * (1-((20-batTemp)*1.3)/100)*(scaledSoc/100))*(effSoh/100)));
+                        //StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.9);
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue((274 * (scaledSoc / 100)) * 1.0);
+                        break;
+                    case 2:
+                        //New BMS firmware EU1
+                        StandardMetrics.ms_v_bat_range_est->SetValue(42.5*((kmPerKwh * (1-((20-batTemp)*1.3)/100)*(scaledSoc/100))*(effSoh/100)));
+                        //StandardMetrics.ms_v_bat_range_est->SetValue((274 * (scaledSoc / 100)) * 0.92);
+                        //StandardMetrics.ms_v_bat_range_ideal->SetValue((StandardMetrics.ms_v_bat_range_est->AsFloat() * ( kmPerKwh / 3.4));
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue(263*(4.1 / 3.4) * (scaledSoc / 100));
+                        break;
+                    default:
+                        //Original BMS firmware
+                        StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+                        StandardMetrics.ms_v_bat_range_ideal->SetValue(263*(scaledSoc / 100));
+                        break;
+                    }
             }
             break;
         case batteryErrorPid:
@@ -203,10 +245,12 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
         case batterySoHPid:
             StandardMetrics.ms_v_bat_soh->SetValue(value / 100.0);
             break;
-        case bmsRangePid:
-            StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+       case bmsRangePid:
+            m_range_raw->SetValue(value);
+            //StandardMetrics.ms_v_bat_range_full->SetValue(value);
             break;
-        case bmsMaxCellVoltagePid:
+
+ case bmsMaxCellVoltagePid:
             m_bms_max_cell_voltage->SetValue(value / 1000.0);
             break;
         case bmsMinCellVoltagePid:
@@ -267,17 +311,42 @@ void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
                 {
                     StandardMetrics.ms_v_charge_state->SetValue("stopped");
                 }
-            } 
+            }
             break;
     }
 }
-
+            
+                
 float OvmsVehicleMgEv::calculateSoc(uint16_t value)
 {
-    int BMSVersion = MyConfig.GetParamValueInt("xmg", "bms.version", DEFAULT_BMS_VERSION);
-    float lowerlimit = BMSDoDLimits[BMSVersion].Lower*10;
-    float upperlimit = BMSDoDLimits[BMSVersion].Upper*10;
+    int lowerlimit;
+    int upperlimit;
     
+    // Setup upper and lower limits from selection on features page
+    switch (MyConfig.GetParamValueInt("xmg", "bmsval"))
+    {
+        /*case 0:
+            //Original BMU firmware DoD range 60 - 970
+            lowerlimit = 60;
+            upperlimit = 970;
+            break;*/
+        case 1:
+            //New BMS firmware A0*
+            lowerlimit = 15;
+            upperlimit = 940;
+            break;
+        case 2:
+            //New BMS firmware EU*
+            lowerlimit = 5;
+            upperlimit = 930;
+            break;
+        default:
+            //Original BMS firmware DoD range 60 - 970
+            lowerlimit = 60;
+            upperlimit = 970;
+            break;
+    }
+
     // Calculate SOC from upper and lower limits
     return (value - lowerlimit) * 100.0f / (upperlimit - lowerlimit);
 }

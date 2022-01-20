@@ -59,10 +59,10 @@ const OvmsVehicle::poll_pid_t common_obdii_polls[] =
     { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell9StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
     { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsMaxCellVoltagePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
     { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsMinCellVoltagePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsTimePid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
-    { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayBPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayGPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayPPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsTimePid, {  0, 60, 60, 0  }, 0, ISOTP_STD },    
+    { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayBPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },    
+    { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayGPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },    
+    { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayPPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },    
     // { dcdcId, dcdcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, dcdcLvCurrentPid, {  0, 30, 30, 0  }, 0, ISOTP_STD }, //Unknown mapping for now
     { dcdcId, dcdcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, dcdcPowerLoadPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
     { dcdcId, dcdcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, dcdcTemperaturePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
@@ -140,7 +140,7 @@ OvmsVehicleMgEv::OvmsVehicleMgEv()
 
     // Set Max Range to WLTP Range
     StandardMetrics.ms_v_bat_range_full->SetValue(WLTP_RANGE);
-
+    
     memset(m_vin, 0, sizeof(m_vin));
 
     PollSetState(PollStateListenOnly);
@@ -168,6 +168,8 @@ OvmsVehicleMgEv::OvmsVehicleMgEv()
     m_vcu_dcdc_output_voltage = MyMetrics.InitFloat("xmg.v.vcu.dcdc.output.voltage", 0, SM_STALE_HIGH, Volts);
     m_vcu_dcdc_temp = MyMetrics.InitFloat("xmg.v.vcu.dcdc.temp", 0, SM_STALE_HIGH, Celcius);
     m_soc_raw = MyMetrics.InitFloat("xmg.v.soc.raw", 0, SM_STALE_HIGH, Percentage);
+    m_range_raw = MyMetrics.InitFloat("xmg.v.range.raw", 0, SM_STALE_HIGH); // temp to monitor bms range
+    m_watt_hour_raw = MyMetrics.InitFloat("xmg.v.watt.hour.raw", 0, SM_STALE_HIGH); // temp to monitor bms range
     m_motor_coolant_temp = MyMetrics.InitFloat("xmg.v.m.coolant.temp", 0, SM_STALE_HIGH, Celcius);
     m_motor_torque = MyMetrics.InitFloat("xmg.v.m.torque", 0, SM_STALE_HIGH, Nm);
     m_ignition_state = MyMetrics.InitInt("xmg.v.ignition.state", SM_STALE_MAX, SM_STALE_MAX);
@@ -183,11 +185,11 @@ OvmsVehicleMgEv::OvmsVehicleMgEv()
     MyConfig.RegisterParam("xmg", "MG EV configuration", true, true);
 
     // ConfigChanged(nullptr); //Now called in ConfigurePollData(). Call ConfigurePollData() in variant specific code.
-
+    
     // Register shell commands
-    m_cmdSoftver = MyCommandApp.RegisterCommand("softver", "MG EV Software", PickOvmsCommandExecuteCallback(OvmsVehicleMgEv::SoftwareVersions));
-	  m_cmdAuth = MyCommandApp.RegisterCommand("auth", "Authenticate with ECUs", AuthenticateECUShell, "<ECU>\nall\tAll ECUs\ngwm\tGWM only\nbcm\tBCM only", 1, 1);
-    m_cmdDRL = MyCommandApp.RegisterCommand("drl", "Daytime running light control", DRLCommandWithAuthShell, "<command>\non\tTurn on\noff\tTurn off", 1, 1);
+    m_cmdSoftver = MyCommandApp.RegisterCommand("softver", "MG EV Software", SoftwareVersions);
+	m_cmdAuth = MyCommandApp.RegisterCommand("auth", "Authenticate with ECUs", AuthenticateECUShell, "<ECU>\nall\tAll ECUs\ngwm\tGWM only\nbcm\tBCM only", 1, 1);    
+    m_cmdDRL = MyCommandApp.RegisterCommand("drl", "Daytime running light control", DRLCommandWithAuthShell, "<command>\non\tTurn on\noff\tTurn off", 1, 1);    
     m_cmdDRLNoAuth = MyCommandApp.RegisterCommand("drln", "Daytime running light control (no BCM authentication)", DRLCommandShell, "<command>\non\tTurn on\noff\tTurn off", 1, 1);
 #ifdef CONFIG_OVMS_COMP_WEBSERVER
     WebInit();
@@ -217,15 +219,15 @@ OvmsVehicleMgEv::~OvmsVehicleMgEv()
 	if (m_cmdAuth)
 	{
 		MyCommandApp.UnregisterCommand(m_cmdAuth->GetName());
-	}
+	}    
 	if (m_cmdDRL)
 	{
 		MyCommandApp.UnregisterCommand(m_cmdDRL->GetName());
-	}
+	} 	  
     if (m_cmdDRLNoAuth)
 	{
 		MyCommandApp.UnregisterCommand(m_cmdDRLNoAuth->GetName());
-	}
+	} 	      
     // MyConfig.DeregisterParam("xmg"); //Seem to sometimes cause OVMS to factory reset
 }
 
@@ -268,12 +270,12 @@ void OvmsVehicleMgEv::ConfigurePollData(const OvmsVehicle::poll_pid_t *SpecificP
     if (SpecificPollData)
     {
         ptr = std::copy(SpecificPollData, &SpecificPollData[DataSize / sizeof(SpecificPollData[0])], ptr);
-    }
+    }  
     ptr = std::copy(common_obdii_polls, &common_obdii_polls[sizeof(common_obdii_polls) / sizeof(common_obdii_polls[0])], ptr);
 
     // Re-start CAN bus, setting up the PID list
     ConfigurePollInterface(CanInterface());
-
+  
 }
 
 void OvmsVehicleMgEv::ConfigurePollData()
@@ -286,7 +288,7 @@ void OvmsVehicleMgEv::processEnergy()
     // When called each to battery power for a second is calculated.
     // This is added to ms_v_bat_energy_recd if regenerating or
     // ms_v_bat_energy_used if power is being drawn from the battery
-
+    
     // Only calculate if the car is turned on and not charging.
     if (StandardMetrics.ms_v_env_awake->AsBool() &&
         !StandardMetrics.ms_v_charge_inprogress->AsBool()) {
@@ -313,17 +315,17 @@ void OvmsVehicleMgEv::processEnergy()
                 if (bat_power < 0) {
                     StandardMetrics.ms_v_bat_energy_recd->SetValue
                     (StandardMetrics.ms_v_bat_energy_recd->AsFloat() + -(energy));
-
+                    
                     StandardMetrics.ms_v_bat_coulomb_recd->SetValue
                     (StandardMetrics.ms_v_bat_coulomb_recd->AsFloat() + -(coulombs));
-
+                    
                 // Calculate power usage. Add power used each second
                 }
                 else
                 {
                     StandardMetrics.ms_v_bat_energy_used->SetValue
                     (StandardMetrics.ms_v_bat_energy_used->AsFloat() + energy);
-
+                    
                     StandardMetrics.ms_v_bat_coulomb_used->SetValue
                     (StandardMetrics.ms_v_bat_coulomb_used->AsFloat() + coulombs);
                 }
@@ -338,37 +340,37 @@ void OvmsVehicleMgEv::processEnergy()
                 StandardMetrics.ms_v_bat_energy_used_total->SetValue
                 (StandardMetrics.ms_v_bat_energy_used_total->AsFloat()
                     + StandardMetrics.ms_v_bat_energy_used->AsFloat());
-
+                
                 StandardMetrics.ms_v_bat_energy_recd_total->SetValue
                 (StandardMetrics.ms_v_bat_energy_recd_total->AsFloat()
                  + StandardMetrics.ms_v_bat_energy_recd->AsFloat());
-
+                
                 StandardMetrics.ms_v_bat_coulomb_used_total->SetValue
                 (StandardMetrics.ms_v_bat_coulomb_used_total->AsFloat()
                  + StandardMetrics.ms_v_bat_coulomb_used->AsFloat());
-
+                
                 StandardMetrics.ms_v_bat_coulomb_recd_total->SetValue
                 (StandardMetrics.ms_v_bat_coulomb_recd_total->AsFloat()
                  + StandardMetrics.ms_v_bat_coulomb_recd->AsFloat());
             }
         }
     }
-
+    
     // Add cumulative charge energy each second to ms_v_charge_power
     if (StandardMetrics.ms_v_charge_inprogress->AsBool())
     {
         mg_cum_energy_charge_wh += StandardMetrics.ms_v_charge_power->AsFloat()*1000/3600;
         StandardMetrics.ms_v_charge_kwh->SetValue(mg_cum_energy_charge_wh/1000);
-
+        
         int limit_soc      = StandardMetrics.ms_v_charge_limit_soc->AsInt(0);
         float limit_range    = StandardMetrics.ms_v_charge_limit_range->AsFloat(0, Kilometers);
         float max_range      = StandardMetrics.ms_v_bat_range_full->AsFloat(0, Kilometers);
-
+        
         // Calculate time to reach 100% charge
         int minsremaining_full = StandardMetrics.ms_v_charge_type->AsString() == "ccs" ? calcMinutesRemaining(100, ccs_steps) : calcMinutesRemaining(100, granny_steps);
         StandardMetrics.ms_v_charge_duration_full->SetValue(minsremaining_full);
         ESP_LOGV(TAG, "Time remaining: %d mins to full", minsremaining_full);
-
+        
         // Calculate time to charge to SoC Limit
         if (limit_soc > 0)
         {
@@ -382,7 +384,7 @@ void OvmsVehicleMgEv::processEnergy()
             }
             ESP_LOGV(TAG, "Time remaining: %d mins to %d%% soc", minsremaining_soc, limit_soc);
         }
-
+        
         // Calculate time to charge to Range Limit
         if (limit_range > 0.0 && max_range > 0.0)
         {
@@ -413,7 +415,7 @@ void OvmsVehicleMgEv::processEnergy()
 // Calculate the time to reach the Target and return in minutes
 int OvmsVehicleMgEv::calcMinutesRemaining(int toSoc, charging_profile charge_steps[])
 {
-
+    
     int minutes = 0;
     int percents_In_Step;
     int fromSoc = StandardMetrics.ms_v_bat_soc->AsInt(100);
@@ -428,6 +430,35 @@ int OvmsVehicleMgEv::calcMinutesRemaining(int toSoc, charging_profile charge_ste
     }
     return minutes;
 }
+
+// Calculate wh/km
+void OvmsVehicleMgEv::calculateEfficiency()
+    {
+    float consumption = 0;
+        if (StdMetrics.ms_v_pos_speed->AsFloat() >= 5)
+            consumption = ABS(StdMetrics.ms_v_bat_power->AsFloat(0, Watts)) / StdMetrics.ms_v_pos_speed->AsFloat();
+        StdMetrics.ms_v_bat_consumption->SetValue((StdMetrics.ms_v_bat_consumption->AsFloat() * 29 + consumption) / 30);
+        consumpRange = ABS(StdMetrics.ms_v_bat_consumption->AsFloat());
+        
+    
+    }
+
+OvmsVehicle::vehicle_command_t OvmsVehicleMgEv::CommandHomelink(int button, int durationms)
+  {
+  ESP_LOGI(TAG, "CommandHomelink");
+  if (button == 0)
+    {
+        StringWriter res;
+            MyScripts.DuktapeEvalNoResult("abrp.send(1)", &res);
+    }
+  if (button == 1)
+    {
+        StringWriter res;
+            MyScripts.DuktapeEvalNoResult("abrp.send(0)", &res);
+    }
+  return NotImplemented;
+  }
+
 
 //Called by OVMS when a wake up command is requested
 void OvmsVehicleMgEv::WakeUp(void* self)
@@ -618,7 +649,7 @@ bool OvmsVehicleMgEv::SendPollMessage(
 // }
 
 // void OvmsVehicleMgEv::SendManualPolls(canbus* currentBus, uint32_t ticker)
-// {
+// { 
 //     for (auto& PollItem : m_ManualPollList)
 //     {
 //         ESP_LOGV(TAG, "[%u] Checking manual poll list. ECU: %03x, PID: %04x, poll interval: %us, last sent time: %u", ticker, PollItem.TXID, PollItem.PID, PollItem.PollInterval[m_poll_state], PollItem.SentTime);
@@ -628,7 +659,7 @@ bool OvmsVehicleMgEv::SendPollMessage(
 //             ESP_LOGV(TAG, "Sending manual poll to %03x @ %04x @ time %u", PollItem.TXID, PollItem.PID, ticker);
 //             PollItem.SentTime = ticker;
 //             std::string Response;
-//             int PollStatus = PollSingleRequest(currentBus, PollItem.TXID, PollItem.TXID | rxFlag, VEHICLE_POLL_TYPE_READDATA, PollItem.PID, Response, SYNC_REQUEST_TIMEOUT, ISOTP_STD);
+//             int PollStatus = PollSingleRequest(currentBus, PollItem.TXID, PollItem.TXID | rxFlag, VEHICLE_POLL_TYPE_READDATA, PollItem.PID, Response, SYNC_REQUEST_TIMEOUT, ISOTP_STD);  
 //             ESP_LOGV(TAG, "Response (%d): %s", PollStatus, hexencode(Response).c_str());
 //         }
 //     }
@@ -655,10 +686,11 @@ OvmsVehicleMgEv* OvmsVehicleMgEv::GetActiveVehicle(OvmsWriter* writer)
     return vehicle;
 }
 
-void OvmsVehicleMgEv::SoftwareVersions(int verbosity, OvmsWriter* writer, OvmsCommand* cmd, int argc, const char* const* argv)
+void OvmsVehicleMgEv::SoftwareVersions(
+        int, OvmsWriter* writer, OvmsCommand*, int, const char* const*)
 {
     OvmsVehicleMgEv* vehicle = OvmsVehicleMgEv::GetActiveVehicle(writer);
-    vehicle->SoftwareVersions(writer);
+    vehicle->SoftwareVersions(writer);	
 }
 
 void OvmsVehicleMgEv::AuthenticateECUShell(int verbosity, OvmsWriter* writer, OvmsCommand* cmd, int argc, const char* const* argv)
@@ -676,7 +708,7 @@ void OvmsVehicleMgEv::AuthenticateECUShell(int verbosity, OvmsWriter* writer, Ov
     else if (strcmp(argv[0], "bcm") == 0)
     {
         AuthSucceeded = vehicle->AuthenticateECU({ECUAuth::BCM});
-    }
+    }    
     else
     {
         writer->puts("Unknown authentication command");
@@ -707,7 +739,7 @@ void OvmsVehicleMgEv::DRLCommandShell(int verbosity, OvmsWriter* writer, OvmsCom
     else
     {
         writer->puts("Unknown authentication command");
-    }
+    }    
 }
 
 void OvmsVehicleMgEv::DRLCommandWithAuthShell(int verbosity, OvmsWriter* writer, OvmsCommand* cmd, int argc, const char* const* argv)
@@ -728,7 +760,7 @@ void OvmsVehicleMgEv::DRLCommandWithAuthShell(int verbosity, OvmsWriter* writer,
     }
     if (vehicle->m_bcm_auth->AsBool())
     {
-        OvmsVehicleMgEv::DRLCommandShell(verbosity, writer, cmd, argc, argv);
+        OvmsVehicleMgEv::DRLCommandShell(verbosity, writer, cmd, argc, argv);  
     }
 }
 
@@ -738,7 +770,7 @@ bool OvmsVehicleMgEv::AuthenticateECU(vector<ECUAuth> ECUsToAuth)
     {
         OvmsRecMutexLock lock(&m_poll_mutex);
         m_poll_plist = nullptr;
-    }
+    }        
     bool AuthSucceeded = true;
     uint8_t a = 0;
     while (a < ECUsToAuth.size() && AuthSucceeded)
@@ -757,10 +789,10 @@ bool OvmsVehicleMgEv::AuthenticateECU(vector<ECUAuth> ECUsToAuth)
                 AuthSucceeded = AuthenticateBCM(m_poll_bus_default);
                 break;
             }
-        }
-        a++;
+        }   
+        a++; 
     }
     // Re-start polling
-    m_poll_plist = m_pollData;
-    return AuthSucceeded;
+    m_poll_plist = m_pollData;  
+    return AuthSucceeded;   
 }

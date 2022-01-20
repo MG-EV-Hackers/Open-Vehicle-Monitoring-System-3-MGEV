@@ -65,7 +65,7 @@ void OvmsVehicleMgEv::WebInit()
 {
     // vehicle menu:
     MyWebServer.RegisterPage("/xmg/features", "Features", WebCfgFeatures, PageMenu_Vehicle, PageAuth_Cookie);
-    MyWebServer.RegisterPage("/xmg/battery",  "Battery config",   WebCfgBattery, PageMenu_Vehicle, PageAuth_Cookie);
+    MyWebServer.RegisterPage("/xmg/battery",  "Battery config", WebCfgBattery, PageMenu_Vehicle, PageAuth_Cookie);
     //MyWebServer.RegisterPage("/bms/cellmon", "BMS cell monitor", OvmsWebServer::HandleBmsCellMonitor, PageMenu_Vehicle, PageAuth_Cookie);
     MyWebServer.RegisterPage("/bms/metrics_charger", "Charging Metrics", WebDispChgMetrics, PageMenu_Vehicle, PageAuth_Cookie);
 }
@@ -86,22 +86,23 @@ void OvmsVehicleMgEv::WebDeInit()
 void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
 {
     std::string error;
-    //When we have more versions, need to change this to int and change from checkbox to select
-    bool updatedbms = DEFAULT_BMS_VERSION == 1 ? true : false;
+    std::string bmstype;
+    int bmsval;
     
     if (c.method == "POST") {
-        updatedbms = (c.getvar("updatedbms") == "yes");
-        
+        bmstype = c.getvar("bmstype");
+        bmsval = atoi(bmstype.c_str());
+
         if (error == "") {
-          // store:
-          //"Updated" BMS is version 1 (corresponding to BMSDoDLimits array element). "Original" BMS is version 0 (corresponding to BMSDoDLimits array element)
-          MyConfig.SetParamValueInt("xmg", "bms.version", updatedbms ? 1 : 0);
-          
-          c.head(200);
-          c.alert("success", "<p class=\"lead\">MG ZS EV / MG5 feature configuration saved.</p>");
-          MyWebServer.OutputHome(p, c);
-          c.done();
-          return;
+            // store:
+            MyConfig.SetParamValueInt("xmg", "bmsval", bmsval);
+            MyConfig.SetParamValue("xmg", "bmstype", bmstype);
+
+            c.head(200);
+            c.alert("success", "<p class=\"lead\">MG ZS EV / MG5 feature configuration saved.</p>");
+            MyWebServer.OutputHome(p, c);
+            c.done();
+            return;
         }
         // output error, return to form:
         error = "<p class=\"lead\">Error!</p><ul class=\"errorlist\">" + error + "</ul>";
@@ -109,27 +110,21 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
         c.alert("danger", error.c_str());
     } else {
         // read configuration:
-        switch (MyConfig.GetParamValueInt("xmg", "bms.version", DEFAULT_BMS_VERSION))
-        {
-          case 0:
-            //"Updated" BMS is version 0 (corresponding to BMSDoDLimits array element)
-            updatedbms = false;
-            break;
-          case 1:
-            //"Original" BMS is version 1 (corresponding to BMSDoDLimits array element)
-            updatedbms = true;
-            break;
-        }
+        bmsval = MyConfig.GetParamValueInt("xmg", "bmsval",0);
+        bmstype = MyConfig.GetParamValue("xmg", "bmstype", "0");
+        
         c.head(200);
     }
     // generate form:
     c.panel_start("primary", "MG ZS EV / MG5 feature configuration");
     c.form_start(p.uri);
-
-    c.fieldset_start("General");
-    //When we have more versions, need to change this to select and updatedbms to int
-    c.input_checkbox("Updated BMS Firmware", "updatedbms", updatedbms,
-      "<p>Select this if you have BMS Firmware later than Jan 2021</p>");
+    
+    c.fieldset_start("BMS Firmware Status");
+    c.input_radio_start("BMS Type", "bmstype");
+    c.input_radio_option("bmstype", "Original BMS Firmware", "0",  bmsval == 0);
+    c.input_radio_option("bmstype", "BMS Firmware A0*", "1", bmsval == 1);
+    c.input_radio_option("bmstype", "BMS Firmware EU*", "2", bmsval == 2);
+    c.input_radio_end("");
     c.fieldset_end();
     c.print("<hr>");
     c.input_button("default", "Save");
@@ -137,7 +132,6 @@ void OvmsVehicleMgEv::WebCfgFeatures(PageEntry_t &p, PageContext_t &c)
     c.panel_end();
     c.done();
 }
-
 /**
  * WebCfgBattery: configure battery parameters (URL /xmg/battery)
  */
@@ -574,4 +568,5 @@ void OvmsVehicleMgEv::WebDispChgMetrics(PageEntry_t &p, PageContext_t &c)
   PAGE_HOOK("body.post");
   c.done();
 }
+            
 #endif //CONFIG_OVMS_COMP_WEBSERVER
