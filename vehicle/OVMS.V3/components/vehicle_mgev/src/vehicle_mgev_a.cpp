@@ -242,6 +242,8 @@ void OvmsVehicleMgEvA::DeterminePollState(canbus* currentBus, uint32_t ticker)
     return;
 }
 
+
+
 void OvmsVehicleMgEvA::ZombieMode()
 {
     // This state is reached as the car is now charging the 12V but the state is not known
