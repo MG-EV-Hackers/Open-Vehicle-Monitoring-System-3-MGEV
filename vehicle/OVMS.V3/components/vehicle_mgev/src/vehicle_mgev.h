@@ -49,24 +49,11 @@
 #define GWM_RETRY_CHECK_STATE_TIMEOUT 5 //seconds. Number of seconds to wait before retry state check.
 #define CAR_UNRESPONSIVE_THRESHOLD 3 //seconds. If reaches this threshold, GWM state will change back to Unknown.
 #define CHARGING_THRESHOLD 12.9 //Volts. If voltage is lower than this, we say 1. 12V battery is not charging and 2. we should sleep OVMS to avoid draining battery too low
-#define DEFAULT_BMS_VERSION 1 //Corresponding to the BMSDoDLimits array element
 #define WLTP_RANGE 263.0 //km
 #define TRANSITION_TIMEOUT 50 //s. Number of seconds after 12V goes below CHARGING_THRESHOLD to stay in current state before going to sleep.
 
 namespace 
 {
-
-typedef struct
-{
-    float Lower;
-    float Upper;
-} BMSDoDLimits_t;
-
-const BMSDoDLimits_t BMSDoDLimits[] = 
-{
-    {6, 97}, //Pre Jan 2021 BMS firmware DoD range 6 - 97
-    {2.5, 94} //Jan 2021 BMS firmware DoD range 2.5 - 94
-};
 
 typedef struct{
        int fromPercent;
@@ -103,6 +90,8 @@ class OvmsVehicleMgEv : public OvmsVehicle
     OvmsMetricFloat *m_vcu_dcdc_input_current, *m_vcu_dcdc_input_voltage, *m_vcu_dcdc_output_current, *m_vcu_dcdc_output_voltage;
     OvmsMetricFloat *m_vcu_dcdc_temp;
     OvmsMetricFloat* m_soc_raw;
+    OvmsMetricFloat* m_range_raw;
+    OvmsMetricFloat* m_watt_hour_raw;
     OvmsMetricFloat* m_motor_coolant_temp;
     OvmsMetricFloat* m_motor_torque;
     OvmsMetricBool* m_radiator_fan;
@@ -111,6 +100,8 @@ class OvmsVehicleMgEv : public OvmsVehicle
     OvmsMetricBool *m_bcm_auth; // True if BCM is authenticated, false if not
     OvmsMetricInt *m_gwm_task, *m_bcm_task; // Current ECU tasks that we are awaiting response for manual frame handling so we know which function to use to handle the responses.
     OvmsMetricInt *m_ignition_state; // For storing state of start switch
+
+    vehicle_command_t CommandHomelink(int button, int durationms=1000);
 
   protected:
     void ConfigChanged(OvmsConfigParam* param) override;
@@ -214,7 +205,8 @@ class OvmsVehicleMgEv : public OvmsVehicle
     // A temporary store for the VIN
     char m_vin[18];
 	  // Store cumulative energy charged
-    float mg_cum_energy_charge_wh;		
+    float mg_cum_energy_charge_wh;
+    float consumpRange;
     // Set to true when send tester present to GWM and set to false when response is received
     bool m_WaitingGWMTesterPresentResponse = false;
     // Count number of times a tester present message is not responded by the GWM
@@ -238,7 +230,9 @@ class OvmsVehicleMgEv : public OvmsVehicle
 
     int calcMinutesRemaining(int target_soc, charging_profile charge_steps[]);
     bool soc_limit_reached;
-    bool range_limit_reached;   
+    bool range_limit_reached;
+    
+    virtual void calculateEfficiency();
 
     // mg_configuration.cpp
     int CanInterface();
@@ -319,3 +313,21 @@ class OvmsVehicleMgEv : public OvmsVehicle
 };
 
 #endif  // __VEHICLE_MGEV_H__
+
+
+/*
+ 
+ #define DEFAULT_BMS_VERSION 1 //Corresponding to the BMSDoDLimits array element
+ 
+ 
+typedef struct
+{
+    float Lower;
+    float Upper;
+} BMSDoDLimits_t;
+
+const BMSDoDLimits_t BMSDoDLimits[] =
+{
+    {6, 97}, //Pre Jan 2021 BMS firmware DoD range 6 - 97
+    {2.5, 94} //Jan 2021 BMS firmware DoD range 2.5 - 94
+};*/

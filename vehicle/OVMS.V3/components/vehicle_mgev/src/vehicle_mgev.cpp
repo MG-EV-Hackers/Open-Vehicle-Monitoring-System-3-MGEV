@@ -168,6 +168,8 @@ OvmsVehicleMgEv::OvmsVehicleMgEv()
     m_vcu_dcdc_output_voltage = MyMetrics.InitFloat("xmg.v.vcu.dcdc.output.voltage", 0, SM_STALE_HIGH, Volts);
     m_vcu_dcdc_temp = MyMetrics.InitFloat("xmg.v.vcu.dcdc.temp", 0, SM_STALE_HIGH, Celcius);
     m_soc_raw = MyMetrics.InitFloat("xmg.v.soc.raw", 0, SM_STALE_HIGH, Percentage);
+    m_range_raw = MyMetrics.InitFloat("xmg.v.range.raw", 0, SM_STALE_HIGH); // temp to monitor bms range
+    m_watt_hour_raw = MyMetrics.InitFloat("xmg.v.watt.hour.raw", 0, SM_STALE_HIGH); // temp to monitor bms range
     m_motor_coolant_temp = MyMetrics.InitFloat("xmg.v.m.coolant.temp", 0, SM_STALE_HIGH, Celcius);
     m_motor_torque = MyMetrics.InitFloat("xmg.v.m.torque", 0, SM_STALE_HIGH, Nm);
     m_ignition_state = MyMetrics.InitInt("xmg.v.ignition.state", SM_STALE_MAX, SM_STALE_MAX);
@@ -428,6 +430,33 @@ int OvmsVehicleMgEv::calcMinutesRemaining(int toSoc, charging_profile charge_ste
     }
     return minutes;
 }
+
+// Calculate wh/km
+void OvmsVehicleMgEv::calculateEfficiency()
+    {
+    float consumption = 0;
+        if (StdMetrics.ms_v_pos_speed->AsFloat() >= 5)
+            consumption = ABS(StdMetrics.ms_v_bat_power->AsFloat(0, Watts)) / StdMetrics.ms_v_pos_speed->AsFloat();
+        StdMetrics.ms_v_bat_consumption->SetValue((StdMetrics.ms_v_bat_consumption->AsFloat() * 29 + consumption) / 30);
+        consumpRange = ABS(StdMetrics.ms_v_bat_consumption->AsFloat());
+        
+    }
+
+OvmsVehicle::vehicle_command_t OvmsVehicleMgEv::CommandHomelink(int button, int durationms)
+  {
+  ESP_LOGI(TAG, "CommandHomelink");
+  if (button == 0)
+    {
+        StringWriter res;
+            MyScripts.DuktapeEvalNoResult("abrp.send(1)", &res);
+    }
+  if (button == 1)
+    {
+        StringWriter res;
+            MyScripts.DuktapeEvalNoResult("abrp.send(0)", &res);
+    }
+  return NotImplemented;
+  }
 
 //Called by OVMS when a wake up command is requested
 void OvmsVehicleMgEv::WakeUp(void* self)
