@@ -22,7 +22,8 @@ jobs:
       matrix:
         # idf_ver: ["latest", "release-v5.1", "release-v5.0", "v5.0.1", "v5.0"]
         # idf_ver: ["release-v5.0", "v5.0.1", "v5.0", "release-v4.4", "v4.4.4", "v3.3.4"]
-        idf_ver: ["latest", "release-v5.1", "release-v5.0", "v5.0.1", "v5.0", "release-v4.4", "v3.3.4"]
+        # idf_ver: ["latest", "release-v5.1", "release-v5.0", "v5.0.1", "v5.0", "release-v4.4", "v3.3.4"]
+        idf_ver: ["release-v5.0", "v5.0.2", "v5.0.1", "v5.0", "release-v4.4", "v3.3.4"]
         idf_target: ["esp32"]
         include:
 
@@ -136,6 +137,15 @@ jobs:
       # For all builds, we have a default sdkconfig file
       - name: 'Setup configuration'
         run: 'cp "vehicle/OVMS.V3/support/${{ matrix.sdkconfig }}" "vehicle/OVMS.V3/sdkconfig.defaults"'
+
+      - name: Cache build dependencies
+        id: esp-idf-build
+        uses: actions/cache@v3
+        with:
+          path: |
+            vehicle/OVMS.V3/build
+            vehicle/OVMS.V3/sdkconfig
+          key: build-${{ runner.os }}-${{ matrix.idf_target }}_esp-idf-${{ matrix.idf_ver }}
 
       # Now, we can build it. Let's not forget to install `dos2unix` first as it is needed.
       - name: 'Build project with IDF-${{ matrix.idf_ver }} for ${{ matrix.idf_target }}'
