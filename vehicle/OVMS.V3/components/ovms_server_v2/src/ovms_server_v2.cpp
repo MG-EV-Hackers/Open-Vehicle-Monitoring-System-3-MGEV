@@ -49,6 +49,7 @@ static const char *TAG = "ovms-server-v2";
 #if CONFIG_MG_ENABLE_SSL
 #include "ovms_tls.h"
 #endif
+#include "mg_version.h"
 
 // should this go in the .h or in the .cpp?
 typedef union {
@@ -175,10 +176,37 @@ bool OvmsServerV2ReaderFilterCallback(OvmsNotifyType* type, const char* subtype)
     return false;
   }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+static void OvmsServerV2MongooseCallback(struct mg_connection *nc, int ev, void *p, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 static void OvmsServerV2MongooseCallback(struct mg_connection *nc, int ev, void *p)
+#endif /* MG_VERSION_NUMBER */
   {
   switch (ev)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_ERROR:
+      {
+      ESP_LOGV(TAG, "OvmsServerV2MongooseCallback(MG_EV_ERROR)");
+      char *error_message = (char *)p;
+      // Connection failed
+      ESP_LOGW(TAG, "Connection failed: %s", error_message);
+      if (MyOvmsServerV2)
+        {
+        MyOvmsServerV2->SetStatus("Error: Connection failed", true, OvmsServerV2::WaitReconnect);
+        MyOvmsServerV2->m_connretry = 60;
+        }
+      }
+      break;
+    case MG_EV_CONNECT:
+      {
+      ESP_LOGV(TAG, "OvmsServerV2MongooseCallback(MG_EV_CONNECT)");
+      // Successful connection
+      ESP_LOGI(TAG, "Connection successful");
+      if (MyOvmsServerV2) MyOvmsServerV2->SendLogin(nc);
+      }
+      break;
+#else /* MG_VERSION_NUMBER */
     case MG_EV_CONNECT:
       {
       int *success = (int*)p;
@@ -201,6 +229,7 @@ static void OvmsServerV2MongooseCallback(struct mg_connection *nc, int ev, void 
         }
       }
       break;
+#endif /* MG_VERSION_NUMBER */
     case MG_EV_CLOSE:
       ESP_LOGV(TAG, "OvmsServerV2MongooseCallback(MG_EV_CLOSE)");
       if (MyOvmsServerV2)
@@ -217,10 +246,22 @@ static void OvmsServerV2MongooseCallback(struct mg_connection *nc, int ev, void 
           }
         }
       break;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_READ:
+      ESP_LOGV(TAG, "OvmsServerV2MongooseCallback(MG_EV_READ)");
+#else /* MG_VERSION_NUMBER */
     case MG_EV_RECV:
       ESP_LOGV(TAG, "OvmsServerV2MongooseCallback(MG_EV_RECV)");
+#endif /* MG_VERSION_NUMBER */
       if (MyOvmsServerV2)
+        {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        MyOvmsServerV2->IncomingData((uint8_t*)nc->recv.buf, nc->recv.len);
+        nc->recv.len = 0;
+#else /* MG_VERSION_NUMBER */
         mbuf_remove(&nc->recv_mbuf, MyOvmsServerV2->IncomingData((uint8_t*)nc->recv_mbuf.buf, nc->recv_mbuf.len));
+#endif /* MG_VERSION_NUMBER */
+        }
       break;
     default:
       break;
@@ -859,21 +900,41 @@ void OvmsServerV2::Connect()
   SetStatus("Connecting...", false, Connecting);
   OvmsMutexLock mg(&m_mgconn_mutex);
   struct mg_mgr* mgr = MyNetManager.GetMongooseMgr();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  ESP_LOGI(TAG, "before mg_connect() address: %s", address.c_str());
+  if ((m_mgconn = mg_connect(mgr, address.c_str(), OvmsServerV2MongooseCallback, NULL)) == NULL)
+    {
+    ESP_LOGE(TAG, "mg_connect(%s) failed", address.c_str());
+    SetStatus("Error: Connection failed", true, WaitReconnect);
+    m_connretry = 60; // Try again in 60 seconds...
+    return;
+    }
+#else /* MG_VERSION_NUMBER */
   struct mg_connect_opts opts;
   const char* err;
   memset(&opts, 0, sizeof(opts));
   opts.error_string = &err;
+#endif /* MG_VERSION_NUMBER */
   if (m_tls)
     {
 #if CONFIG_MG_ENABLE_SSL
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    struct mg_tls_opts opts;
+    memset(&opts, 0, sizeof(opts));
+    opts.ca = MyOvmsTLS.GetTrustedList();
+    opts.srvname = mg_str(m_server.c_str());
+    mg_tls_init(m_mgconn, &opts);
+#else /* MG_VERSION_NUMBER */
     opts.ssl_ca_cert = MyOvmsTLS.GetTrustedList();
     opts.ssl_server_name = m_server.c_str();
+#endif /* MG_VERSION_NUMBER */
 #else
     ESP_LOGE(TAG, "mg_connect(%s) failed: SSL support disabled", address.c_str());
     SetStatus("Error: Connection failed (SSL support disabled)", true, Undefined);
     return;
 #endif
     }
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
   if ((m_mgconn = mg_connect_opt(mgr, address.c_str(), OvmsServerV2MongooseCallback, opts)) == NULL)
     {
     ESP_LOGE(TAG, "mg_connect(%s) failed: %s", address.c_str(), err);
@@ -881,6 +942,7 @@ void OvmsServerV2::Connect()
     m_connretry = 60; // Try again in 60 seconds...
     return;
     }
+#endif /* MG_VERSION_NUMBER */
   return;
   }
 
@@ -889,7 +951,11 @@ void OvmsServerV2::Disconnect()
   OvmsMutexLock mg(&m_mgconn_mutex);
   if (m_mgconn)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    m_mgconn->is_closing = 1;         // Tell mongoose to close this connection
+#else /* MG_VERSION_NUMBER */
     m_mgconn->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
     m_mgconn = NULL;
     }
   m_buffer->EmptyAll();
@@ -903,7 +969,11 @@ void OvmsServerV2::Reconnect(int connretry)
   OvmsMutexLock mg(&m_mgconn_mutex);
   if (m_mgconn)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    m_mgconn->is_closing = 1;         // Tell mongoose to close this connection
+#else /* MG_VERSION_NUMBER */
     m_mgconn->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
     m_mgconn = NULL;
     }
   m_buffer->EmptyAll();
