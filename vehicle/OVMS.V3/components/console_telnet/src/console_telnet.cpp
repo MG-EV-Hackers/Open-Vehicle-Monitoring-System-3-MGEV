@@ -232,7 +232,7 @@ void ConsoleTelnet::Receive()
   else
     ESP_LOGE(tag, "Timeout queueing message in ConsoleTelnet::Receive\n");
 #if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
-  event.mbuf->len = 0;
+  mg_iobuf_del(event.mbuf, 0, event.mbuf->len);
 #else /* MG_VERSION_NUMBER */
   mbuf_remove(event.mbuf, event.mbuf->len);
 #endif /* MG_VERSION_NUMBER */
