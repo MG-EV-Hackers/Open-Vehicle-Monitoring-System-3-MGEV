@@ -41,6 +41,7 @@
 #include "ovms_events.h"
 #include "console_telnet.h"
 #include "ovms_netmanager.h"
+#include "mg_version.h"
 
 //#define LOGEVENTS
 #ifdef LOGEVENTS
@@ -56,7 +57,11 @@ static const char newline = '\n';
 
 OvmsTelnet MyTelnet __attribute__ ((init_priority (8300)));
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+static void MongooseHandler(struct mg_connection *nc, int ev, void *p, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 static void MongooseHandler(struct mg_connection *nc, int ev, void *p)
+#endif /* MG_VERSION_NUMBER */
   {
   MyTelnet.EventHandler(nc, ev, p);
   }
@@ -69,21 +74,37 @@ void OvmsTelnet::EventHandler(struct mg_connection *nc, int ev, void *p)
     case MG_EV_ACCEPT:
       {
       ConsoleTelnet* child = new ConsoleTelnet(nc);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      nc->fn_data = child;
+#else /* MG_VERSION_NUMBER */
       nc->user_data = child;
+#endif /* MG_VERSION_NUMBER */
       break;
       }
 
     case MG_EV_POLL:
       {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      ConsoleTelnet* child = (ConsoleTelnet*)nc->fn_data;
+#else /* MG_VERSION_NUMBER */
       ConsoleTelnet* child = (ConsoleTelnet*)nc->user_data;
+#endif /* MG_VERSION_NUMBER */
       if (child)
         child->Poll(0);
       }
       break;
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_READ:
+#else /* MG_VERSION_NUMBER */
     case MG_EV_RECV:
+#endif /* MG_VERSION_NUMBER */
       {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      ConsoleTelnet* child = (ConsoleTelnet*)nc->fn_data;
+#else /* MG_VERSION_NUMBER */
       ConsoleTelnet* child = (ConsoleTelnet*)nc->user_data;
+#endif /* MG_VERSION_NUMBER */
       child->Receive();
       child->Poll(0);
       }
@@ -91,7 +112,11 @@ void OvmsTelnet::EventHandler(struct mg_connection *nc, int ev, void *p)
 
     case MG_EV_CLOSE:
       {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      ConsoleTelnet* child = (ConsoleTelnet*)nc->fn_data;
+#else /* MG_VERSION_NUMBER */
       ConsoleTelnet* child = (ConsoleTelnet*)nc->user_data;
+#endif /* MG_VERSION_NUMBER */
       if (child)
         delete child;
       }
@@ -128,9 +153,17 @@ void OvmsTelnet::NetManInit(std::string event, void* data)
 
   ESP_LOGI(tag, "Launching Telnet Server");
   struct mg_mgr* mgr = MyNetManager.GetMongooseMgr();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_connection* nc = mg_listen(mgr, ":23", MongooseHandler, NULL);
+#else /* MG_VERSION_NUMBER */
   mg_connection* nc = mg_bind(mgr, ":23", MongooseHandler);
+#endif /* MG_VERSION_NUMBER */
   if (nc)
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    nc->fn_data = NULL;
+#else /* MG_VERSION_NUMBER */
     nc->user_data = NULL;
+#endif /* MG_VERSION_NUMBER */
   else
     ESP_LOGE(tag, "Launching Telnet Server failed");
   }
@@ -185,7 +218,11 @@ void ConsoleTelnet::Receive()
   {
   OvmsConsole::Event event;
   event.type = OvmsConsole::event_type_t::RECV;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  event.mbuf = &m_connection->recv;
+#else /* MG_VERSION_NUMBER */
   event.mbuf = &m_connection->recv_mbuf;
+#endif /* MG_VERSION_NUMBER */
   BaseType_t ret = xQueueSendToBack(m_queue, (void * )&event, (portTickType)(1000 / portTICK_PERIOD_MS));
   if (ret == pdPASS)
     {
@@ -194,7 +231,11 @@ void ConsoleTelnet::Receive()
     }
   else
     ESP_LOGE(tag, "Timeout queueing message in ConsoleTelnet::Receive\n");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  event.mbuf->len = 0;
+#else /* MG_VERSION_NUMBER */
   mbuf_remove(event.mbuf, event.mbuf->len);
+#endif /* MG_VERSION_NUMBER */
   }
 
 void ConsoleTelnet::HandleDeviceEvent(void* pEvent)
@@ -203,7 +244,7 @@ void ConsoleTelnet::HandleDeviceEvent(void* pEvent)
   switch (event.type)
     {
     case RECV:
-      telnet_recv(m_telnet, event.mbuf->buf, event.mbuf->len);
+      telnet_recv(m_telnet, (const char *) event.mbuf->buf, event.mbuf->len);
       break;
 
     default:
@@ -251,7 +292,11 @@ void ConsoleTelnet::TelnetHandler(telnet_event_t *event)
 void ConsoleTelnet::Exit()
   {
   printf("logout\n");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  m_connection->is_draining = 1;
+#else /* MG_VERSION_NUMBER */
   m_connection->flags |= MG_F_SEND_AND_CLOSE;
+#endif /* MG_VERSION_NUMBER */
   }
 
 int ConsoleTelnet::puts(const char* s)
@@ -276,7 +321,11 @@ int ConsoleTelnet::printf(const char* fmt, ...)
 
 ssize_t ConsoleTelnet::write(const void *buf, size_t nbyte)
   {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  if (!m_telnet || (m_connection->is_draining))
+#else /* MG_VERSION_NUMBER */
   if (!m_telnet || (m_connection->flags & MG_F_SEND_AND_CLOSE))
+#endif /* MG_VERSION_NUMBER */
     return 0;
   telnet_send_text(m_telnet, (const char*)buf, nbyte);
   return nbyte;
