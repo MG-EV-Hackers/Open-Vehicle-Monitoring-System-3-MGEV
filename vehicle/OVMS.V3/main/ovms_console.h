@@ -33,6 +33,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "ovms_shell.h"
+#include "mg_version.h"
 
 #define TOKEN_MAX_LENGTH 32
 #define COMPLETION_MAX_TOKENS 20
@@ -40,7 +41,11 @@
 class OvmsCommandMap;
 class Parent;
 class LogBuffers;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+struct mg_iobuf;
+#else /* MG_VERSION_NUMBER */
 struct mbuf;
+#endif /* MG_VERSION_NUMBER */
 
 class OvmsConsole : public OvmsShell
   {
@@ -68,7 +73,11 @@ class OvmsConsole : public OvmsShell
         char* buffer;       // Pointer to ALERT buffer
         LogBuffers* multi;  // Pointer to ALERT_MULTI message
         ssize_t size;       // Buffer size for RECV
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        struct mg_iobuf* mbuf;  // IO Buffer for RECV with Mongoose
+#else /* MG_VERSION_NUMBER */
         struct mbuf* mbuf;  // Buffer pointer for RECV with Mongoose
+#endif /* MG_VERSION_NUMBER */
         };
       } Event;
 
