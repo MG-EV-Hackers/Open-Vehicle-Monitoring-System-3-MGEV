@@ -112,7 +112,11 @@ void WebSocketHandler::ProcessTxJob()
         msg = "{\"event\":\"";
         msg += m_job.event;
         msg += "\"}";
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_ws_send(m_nc, msg.data(), msg.size(), WEBSOCKET_OP_TEXT);
+#else /* MG_VERSION_NUMBER */
         mg_send_websocket_frame(m_nc, WEBSOCKET_OP_TEXT, msg.data(), msg.size());
+#endif /* MG_VERSION_NUMBER */
         m_sent = 1;
       }
       break;
@@ -152,7 +156,11 @@ void WebSocketHandler::ProcessTxJob()
         if (i) {
           msg += "}}";
           ESP_EARLY_LOGV(TAG, "WebSocket msg: %s", msg.c_str());
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+          mg_ws_send(m_nc, msg.data(), msg.size(), WEBSOCKET_OP_TEXT);
+#else /* MG_VERSION_NUMBER */
           mg_send_websocket_frame(m_nc, WEBSOCKET_OP_TEXT, msg.data(), msg.size());
+#endif /* MG_VERSION_NUMBER */
           m_sent += i;
         }
       }
@@ -218,7 +226,11 @@ void WebSocketHandler::ProcessTxJob()
         if (i) {
           msg += "}}}";
           ESP_EARLY_LOGD(TAG, "WebSocket msg: %s", msg.c_str());
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+          mg_ws_send(m_nc, msg.data(), msg.size(), WEBSOCKET_OP_TEXT);
+#else /* MG_VERSION_NUMBER */
           mg_send_websocket_frame(m_nc, WEBSOCKET_OP_TEXT, msg.data(), msg.size());
+#endif /* MG_VERSION_NUMBER */
           m_sent += i;
         }
       }
@@ -281,7 +293,11 @@ void WebSocketHandler::ProcessTxJob()
         if (i) {
           msg += "}}}";
           ESP_EARLY_LOGD(TAG, "WebSocket msg: %s", msg.c_str());
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+          mg_ws_send(m_nc, msg.data(), msg.size(), WEBSOCKET_OP_TEXT);
+#else /* MG_VERSION_NUMBER */
           mg_send_websocket_frame(m_nc, WEBSOCKET_OP_TEXT, msg.data(), msg.size());
+#endif /* MG_VERSION_NUMBER */
           m_sent += i;
         }
       }
@@ -306,6 +322,10 @@ void WebSocketHandler::ProcessTxJob()
         std::string msg;
         msg.reserve(XFER_CHUNK_SIZE+128);
         int op;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        bool should_clear_fin_bit = false;
+        size_t buffer_start = 0;
+#endif /* MG_VERSION_NUMBER */
         
         if (m_sent == 0) {
           op = WEBSOCKET_OP_TEXT;
@@ -324,13 +344,25 @@ void WebSocketHandler::ProcessTxJob()
         m_sent += part.size();
         
         if (m_sent < m_job.notification->GetValueSize()+1) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+          should_clear_fin_bit = true;
+          buffer_start = m_nc->send.len;
+#else /* MG_VERSION_NUMBER */
           op |= WEBSOCKET_DONT_FIN;
+#endif /* MG_VERSION_NUMBER */
         } else {
           msg += "\"}}";
         }
         
         // send frame:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_ws_send(m_nc, msg.data(), msg.size(), op);
+        if (should_clear_fin_bit) {
+          m_nc->send.buf[buffer_start] &= ~128;  // Clear FIN flag
+        }
+#else /* MG_VERSION_NUMBER */
         mg_send_websocket_frame(m_nc, op, msg.data(), msg.size());
+#endif /* MG_VERSION_NUMBER */
         ESP_EARLY_LOGV(TAG, "WebSocketHandler[%p]: ProcessTxJob type=%d: sent %d bytes, op=%04x", m_nc, m_job.type, m_sent, op);
       }
       break;
@@ -355,7 +387,11 @@ void WebSocketHandler::ProcessTxJob()
         msg = "{\"log\":\"";
         msg += json_encode(stripesc(*it));
         msg += "\"}";
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_ws_send(m_nc, msg.data(), msg.size(), WEBSOCKET_OP_TEXT);
+#else /* MG_VERSION_NUMBER */
         mg_send_websocket_frame(m_nc, WEBSOCKET_OP_TEXT, msg.data(), msg.size());
+#endif /* MG_VERSION_NUMBER */
         m_sent++;
       }
       else if (m_ack == m_sent) {
@@ -473,12 +509,24 @@ int WebSocketHandler::HandleEvent(int ev, void* p)
 {
   switch (ev)
   {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_WS_MSG:
+#else /* MG_VERSION_NUMBER */
     case MG_EV_WEBSOCKET_FRAME:
+#endif /* MG_VERSION_NUMBER */
     {
       // websocket message received
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      struct mg_ws_message* wm = (struct mg_ws_message*) p;
+#else /* MG_VERSION_NUMBER */
       websocket_message* wm = (websocket_message*) p;
+#endif /* MG_VERSION_NUMBER */
       std::string msg;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      msg.assign(wm->data.ptr, wm->data.len);
+#else /* MG_VERSION_NUMBER */
       msg.assign((char*) wm->data, wm->size);
+#endif /* MG_VERSION_NUMBER */
       HandleIncomingMsg(msg);
       break;
     }
@@ -502,7 +550,11 @@ int WebSocketHandler::HandleEvent(int ev, void* p)
       }
       break;
     
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_WRITE:
+#else /* MG_VERSION_NUMBER */
     case MG_EV_SEND:
+#endif /* MG_VERSION_NUMBER */
       // last transmission has finished
       ESP_EARLY_LOGV(TAG, "WebSocketHandler[%p] EV_SEND qlen=%d jobtype=%d sent=%d ack=%d", m_nc,
         m_jobqueue ? uxQueueMessagesWaiting(m_jobqueue) : -1, m_job.type, m_sent, m_ack);
@@ -771,6 +823,50 @@ void OvmsWebServer::UpdateTicker(TimerHandle_t timer)
   xSemaphoreGive(MyWebServer.m_client_mutex);
 }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+// From https://github.com/cesanta/mongoose/blob/80d74e9e341d541f71c0fa587d22cec89be32dd5/src/mg_mqtt.c#
+// Renamed and adapted to new Mongoose mg_str API
+static struct mg_str ovms_mqtt_next_topic_component(struct mg_str *topic) {
+  struct mg_str res = *topic;
+  const char *c = mg_strstr(*topic, mg_str("/"));
+  if (c != NULL) {
+    res.len = (c - topic->ptr);
+    topic->len -= (res.len + 1);
+    topic->ptr += (res.len + 1);
+  } else {
+    topic->len = 0;
+  }
+  return res;
+}
+
+/* Refernce: https://mosquitto.org/man/mqtt-7.html */
+int ovms_mqtt_match_topic_expression(struct mg_str exp, struct mg_str topic) {
+  struct mg_str ec, tc;
+  if (exp.len == 0) return 0;
+  while (1) {
+    ec = ovms_mqtt_next_topic_component(&exp);
+    tc = ovms_mqtt_next_topic_component(&topic);
+    if (ec.len == 0) {
+      if (tc.len != 0) return 0;
+      if (exp.len == 0) break;
+      continue;
+    }
+    if (mg_vcmp(&ec, "+") == 0) {
+      if (tc.len == 0 && topic.len == 0) return 0;
+      continue;
+    }
+    if (mg_vcmp(&ec, "#") == 0) {
+      /* Must be the last component in the expression or it's invalid. */
+      return (exp.len == 0);
+    }
+    if (mg_strcmp(ec, tc) != 0) {
+      return 0;
+    }
+  }
+  return (tc.len == 0 && topic.len == 0);
+}
+#endif /* MG_VERSION_NUMBER */
+
 /**
  * Notifications:
  */
@@ -778,11 +874,19 @@ void OvmsWebServer::UpdateTicker(TimerHandle_t timer)
 void WebSocketHandler::Subscribe(std::string topic)
 {
   for (auto it = m_subscriptions.begin(); it != m_subscriptions.end();) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    if (ovms_mqtt_match_topic_expression(mg_str_n(topic.data(), topic.length()), mg_str_n((*it).data(), (*it).length()))) {
+#else /* MG_VERSION_NUMBER */
     if (mg_mqtt_match_topic_expression(mg_mk_str(topic.c_str()), mg_mk_str((*it).c_str()))) {
+#endif /* MG_VERSION_NUMBER */
       // remove topic covered by new subscription:
       ESP_LOGD(TAG, "WebSocketHandler[%p]: subscription '%s' removed", m_nc, (*it).c_str());
       it = m_subscriptions.erase(it);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    } else if (ovms_mqtt_match_topic_expression(mg_str_n((*it).data(), (*it).length()), mg_str_n(topic.data(), topic.length()))) {
+#else /* MG_VERSION_NUMBER */
     } else if (mg_mqtt_match_topic_expression(mg_mk_str((*it).c_str()), mg_mk_str(topic.c_str()))) {
+#endif /* MG_VERSION_NUMBER */
       // new subscription covered by existing:
       ESP_LOGD(TAG, "WebSocketHandler[%p]: subscription '%s' already covered by '%s'", m_nc, topic.c_str(), (*it).c_str());
       return;
@@ -799,7 +903,11 @@ void WebSocketHandler::Unsubscribe(std::string topic)
 {
   bool changed = false;
   for (auto it = m_subscriptions.begin(); it != m_subscriptions.end();) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    if (ovms_mqtt_match_topic_expression(mg_str_n(topic.data(), topic.length()), mg_str_n((*it).data(), (*it).length()))) {
+#else /* MG_VERSION_NUMBER */
     if (mg_mqtt_match_topic_expression(mg_mk_str(topic.c_str()), mg_mk_str((*it).c_str()))) {
+#endif /* MG_VERSION_NUMBER */
       ESP_LOGD(TAG, "WebSocketHandler[%p]: subscription '%s' removed", m_nc, (*it).c_str());
       it = m_subscriptions.erase(it);
       changed = true;
@@ -848,7 +956,11 @@ void WebSocketHandler::UnitsCheckVehicleSubscribe()
 bool WebSocketHandler::IsSubscribedTo(std::string topic)
 {
   for (auto it = m_subscriptions.begin(); it != m_subscriptions.end(); it++) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    if (ovms_mqtt_match_topic_expression(mg_str_n((*it).data(), (*it).length()), mg_str_n(topic.data(), topic.length()))) {
+#else /* MG_VERSION_NUMBER */
     if (mg_mqtt_match_topic_expression(mg_mk_str((*it).c_str()), mg_mk_str(topic.c_str()))) {
+#endif /* MG_VERSION_NUMBER */
       return true;
     }
   }
