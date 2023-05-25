@@ -51,6 +51,7 @@
 #include "ovms_netmanager.h"
 #include "ovms_utils.h"
 #include "log_buffers.h"
+#include "mg_version.h"
 
 // The setup wizard currently is tailored to be used with a WiFi enabled module:
 #ifdef CONFIG_OVMS_COMP_WIFI
@@ -135,7 +136,11 @@ typedef PageResult_t (*PageCallback_t)(PageEntry_t& p, PageContext_t& c, const s
 struct PageContext : public ExternalRamAllocated
 {
   mg_connection *nc;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  struct mg_http_message *hm;
+#else /* MG_VERSION_NUMBER */
   http_message *hm;
+#endif /* MG_VERSION_NUMBER */
   user_session *session;
   std::string method;
   std::string uri;
@@ -285,12 +290,20 @@ class MgHandler : public ExternalRamAllocated
     {
       m_nc = nc;
       if (m_nc)
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        m_nc->fn_data = this;
+#else /* MG_VERSION_NUMBER */
         m_nc->user_data = this;
+#endif /* MG_VERSION_NUMBER */
     }
     virtual ~MgHandler()
     {
       if (m_nc)
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        m_nc->fn_data = NULL;
+#else /* MG_VERSION_NUMBER */
         m_nc->user_data = NULL;
+#endif /* MG_VERSION_NUMBER */
     }
 
   public:
@@ -498,7 +511,11 @@ class OvmsWebServer : public ExternalRamAllocated
     ~OvmsWebServer();
 
   public:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    static void EventHandler(mg_connection *nc, int ev, void *p, void *fn_data);
+#else /* MG_VERSION_NUMBER */
     static void EventHandler(mg_connection *nc, int ev, void *p);
+#endif /* MG_VERSION_NUMBER */
     void NetManInit(std::string event, void* data);
     void NetManStop(std::string event, void* data);
     void ConfigChanged(std::string event, void* data);
@@ -524,9 +541,14 @@ class OvmsWebServer : public ExternalRamAllocated
     static PageResult_t PluginCallback(PageEntry_t& p, PageContext_t& c, const std::string& hook);
 
   public:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    user_session* CreateSession(const mg_http_message *hm);
+    user_session* GetSession(mg_http_message *hm);
+#else /* MG_VERSION_NUMBER */
     user_session* CreateSession(const http_message *hm);
-    void DestroySession(user_session *s);
     user_session* GetSession(http_message *hm);
+#endif /* MG_VERSION_NUMBER */
+    void DestroySession(user_session *s);
     void CheckSessions(void);
     static bool CheckLogin(std::string username, std::string password);
 
@@ -615,6 +637,11 @@ class OvmsWebServer : public ExternalRamAllocated
 
     int                       m_init_timeout;
     int                       m_shutdown_countdown;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  protected:
+    struct mg_timer           m_session_timer;
+#endif /* MG_VERSION_NUMBER */
+
 };
 
 extern OvmsWebServer MyWebServer;

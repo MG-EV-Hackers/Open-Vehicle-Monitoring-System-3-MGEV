@@ -38,6 +38,7 @@ static const char *TAG = "webserver";
 
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 #include <fstream>
 #include "ovms_webserver.h"
 #include "ovms_config.h"
@@ -146,6 +147,11 @@ OvmsWebServer::~OvmsWebServer()
   // never destroyed
 }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+void session_timer_fn(void *data) {
+  MyWebServer.CheckSessions();
+}
+#endif /* MG_VERSION_NUMBER */
 
 void OvmsWebServer::NetManInit(std::string event, void* data)
 {
@@ -159,32 +165,65 @@ void OvmsWebServer::NetManInit(std::string event, void* data)
 
   struct mg_mgr* mgr = MyNetManager.GetMongooseMgr();
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  struct mg_tls_opts opts = {};
+  memset(&opts, 0, sizeof(opts));
+#else /* MG_VERSION_NUMBER */
   char *error_string;
   struct mg_bind_opts bind_opts = {};
   memset(&bind_opts, 0, sizeof(bind_opts));
   bind_opts.error_string = (const char**) &error_string;
+#endif /* MG_VERSION_NUMBER */
 
   // bind http:
   ESP_LOGI(TAG, "Binding to port 80 (http)");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  struct mg_connection *nc = mg_http_listen(mgr, ":80", EventHandler, NULL);
+#else /* MG_VERSION_NUMBER */
   struct mg_connection *nc = mg_bind_opt(mgr, ":80", EventHandler, bind_opts);
+#endif /* MG_VERSION_NUMBER */
   if (!nc) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    ESP_LOGE(TAG, "Cannot bind to port 80 (http)");
+#else /* MG_VERSION_NUMBER */
     ESP_LOGE(TAG, "Cannot bind to port 80 (http): %s", error_string);
+#endif /* MG_VERSION_NUMBER */
   } else {
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
     mg_set_protocol_http_websocket(nc);
+#endif /* MG_VERSION_NUMBER */
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    mg_timer_init(&mgr->timers, &m_session_timer, SESSION_CHECK_INTERVAL, MG_TIMER_REPEAT, session_timer_fn, NULL);
+#else /* MG_VERSION_NUMBER */
     mg_set_timer(nc, mg_time() + SESSION_CHECK_INTERVAL);
+#endif /* MG_VERSION_NUMBER */
   }
 
 #ifdef CONFIG_MG_ENABLE_SSL
   // bind https:
   if (path_exists("/store/tls/webserver.crt") && path_exists("/store/tls/webserver.key")) {
     ESP_LOGI(TAG, "Binding to port 443 (https)");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    nc = mg_http_listen(mgr, ":443", EventHandler, NULL);
+    opts.cert = "/store/tls/webserver.crt";
+    opts.certkey = "/store/tls/webserver.key";
+#else /* MG_VERSION_NUMBER */
     bind_opts.ssl_cert = "/store/tls/webserver.crt";
     bind_opts.ssl_key = "/store/tls/webserver.key";
     nc = mg_bind_opt(mgr, ":443", EventHandler, bind_opts);
+#endif /* MG_VERSION_NUMBER */
     if (!nc) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      ESP_LOGE(TAG, "Cannot bind to port 443 (https)");
+#else /* MG_VERSION_NUMBER */
       ESP_LOGE(TAG, "Cannot bind to port 443 (https): %s", error_string);
+#endif /* MG_VERSION_NUMBER */
     } else {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      mg_tls_init(nc, &opts);
+#else /* MG_VERSION_NUMBER */
       mg_set_protocol_http_websocket(nc);
+#endif /* MG_VERSION_NUMBER */
     }
   }
 #endif // CONFIG_MG_ENABLE_SSL
@@ -194,6 +233,10 @@ void OvmsWebServer::NetManStop(std::string event, void* data)
 {
   if (m_running) {
     ESP_LOGI(TAG,"Stopping Web Server");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    struct mg_mgr* mgr = MyNetManager.GetMongooseMgr();
+    mg_timer_free(&mgr->timers, &m_session_timer);
+#endif /* MG_VERSION_NUMBER */
     m_running = false;
   }
 }
@@ -305,13 +348,24 @@ const std::string OvmsWebServer::MakeDigestAuth(const char* realm, const char* u
   line += password;
 
   unsigned char digest[16];
+  char hex[33];
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_md5_ctx md5_ctx;
+  mg_md5_init(&md5_ctx);
+  mg_md5_update(&md5_ctx, (const unsigned char*) line.data(), line.length());
+  mg_md5_final(&md5_ctx, digest);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+  mg_snprintf(hex, sizeof(hex), "%M", mg_print_hex, sizeof(digest), digest);
+#else /* MG_VERSION_NUMBER */
+  mg_snprintf(hex, sizeof(hex), "%H", sizeof(digest), digest);
+#endif /* MG_VERSION_NUMBER */
+#else /* MG_VERSION_NUMBER */
   cs_md5_ctx md5_ctx;
   cs_md5_init(&md5_ctx);
   cs_md5_update(&md5_ctx, (const unsigned char*) line.data(), line.length());
   cs_md5_final(digest, &md5_ctx);
-
-  char hex[33];
   cs_to_hex(hex, digest, sizeof(digest));
+#endif /* MG_VERSION_NUMBER */
 
   line = username;
   line += ":";
@@ -520,12 +574,20 @@ PageResult_t OvmsWebServer::PluginCallback(PageEntry_t& p, PageContext_t& c, con
 /**
  * EventHandler: this is the mongoose main event handler.
  */
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+void OvmsWebServer::EventHandler(mg_connection *nc, int ev, void *p, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 void OvmsWebServer::EventHandler(mg_connection *nc, int ev, void *p)
+#endif /* MG_VERSION_NUMBER */
 {
   PageContext_t c;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  MgHandler* handler = (MgHandler*) nc->fn_data;
+#else /* MG_VERSION_NUMBER */
   MgHandler* handler = (MgHandler*) nc->user_data;
+#endif /* MG_VERSION_NUMBER */
 
-  //if (ev != MG_EV_POLL && ev != MG_EV_SEND)
+  //if (ev != MG_EV_POLL && ev != MG_EV_SEND) // MG_EV_WRITE for Mongoose >= 7
   //if (nc->user_data)
   //  ESP_EARLY_LOGV(TAG, "EventHandler: conn=%p handler=%p ev=%d p=%p rxbufsz=%d, txbufsz=%d", nc, nc->user_data, ev, p, nc->recv_mbuf.size, nc->send_mbuf.size);
 
@@ -536,19 +598,43 @@ void OvmsWebServer::EventHandler(mg_connection *nc, int ev, void *p)
   // framework handling:
   switch (ev)
   {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_WS_OPEN:                     // new websocket connection
+#else /* MG_VERSION_NUMBER */
     case MG_EV_WEBSOCKET_HANDSHAKE_DONE:    // new websocket connection
+#endif /* MG_VERSION_NUMBER */
       {
         MyWebServer.CreateWebSocketHandler(nc);
       }
       break;
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_HTTP_MSG:                    // standard HTTP request
+#else /* MG_VERSION_NUMBER */
     case MG_EV_HTTP_REQUEST:                // standard HTTP request
+#endif /* MG_VERSION_NUMBER */
       {
         c.nc = nc;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        c.hm = (struct mg_http_message *) p;
+        if (mg_http_match_uri(c.hm, "/msg")) {
+          // Upgrade to websocket. From now on, a connection is a full-duplex
+          // Websocket connection, which will receive MG_EV_WS_MSG events.
+          mg_ws_upgrade(c.nc, c.hm, NULL);
+          break;
+        }
+
+#else /* MG_VERSION_NUMBER */
         c.hm = (struct http_message *) p;
+#endif /* MG_VERSION_NUMBER */
         c.session = MyWebServer.GetSession(c.hm);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        c.method.assign(c.hm->method.ptr, c.hm->method.len);
+        c.uri.assign(c.hm->uri.ptr, c.hm->uri.len);
+#else /* MG_VERSION_NUMBER */
         c.method.assign(c.hm->method.p, c.hm->method.len);
         c.uri.assign(c.hm->uri.p, c.hm->uri.len);
+#endif /* MG_VERSION_NUMBER */
         ESP_LOGI(TAG, "HTTP %s %s", c.method.c_str(), c.uri.c_str());
 
         PageEntry* page = MyWebServer.FindPage(c.uri.c_str());
@@ -560,8 +646,13 @@ void OvmsWebServer::EventHandler(mg_connection *nc, int ev, void *p)
         else if (MyWebServer.m_file_enable) {
           // serve from file space:
           if (MyConfig.ProtectedPath(c.uri)) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+            mg_http_reply(c.nc, 401, "", "");
+            nc->is_draining = 1;
+#else /* MG_VERSION_NUMBER */
             mg_http_send_error(c.nc, 401, "Unauthorized");
             nc->flags |= MG_F_SEND_AND_CLOSE;
+#endif /* MG_VERSION_NUMBER */
           }
           else {
             mg_serve_http(nc, c.hm, MyWebServer.m_file_opts);
@@ -569,8 +660,13 @@ void OvmsWebServer::EventHandler(mg_connection *nc, int ev, void *p)
         }
 #endif //MG_ENABLE_FILESYSTEM
         else {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+          mg_http_reply(c.nc, 404, "", "");
+          nc->is_draining = 1;
+#else /* MG_VERSION_NUMBER */
           mg_http_send_error(c.nc, 404, "Not found");
           nc->flags |= MG_F_SEND_AND_CLOSE;
+#endif /* MG_VERSION_NUMBER */
         }
       }
       break;
@@ -578,7 +674,11 @@ void OvmsWebServer::EventHandler(mg_connection *nc, int ev, void *p)
     case MG_EV_CLOSE:                       // connection has been closed
       {
         if (handler) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+          if (nc->is_websocket)
+#else /* MG_VERSION_NUMBER */
           if (nc->flags & MG_F_IS_WEBSOCKET)
+#endif /* MG_VERSION_NUMBER */
             MyWebServer.DestroyWebSocketHandler((WebSocketHandler*)handler);
           else
             delete handler;
@@ -586,6 +686,7 @@ void OvmsWebServer::EventHandler(mg_connection *nc, int ev, void *p)
       }
       break;
 
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
     case MG_EV_TIMER:
       {
         // Perform session maintenance:
@@ -593,6 +694,7 @@ void OvmsWebServer::EventHandler(mg_connection *nc, int ev, void *p)
         mg_set_timer(nc, mg_time() + SESSION_CHECK_INTERVAL);
       }
       break;
+#endif /* MG_VERSION_NUMBER */
 
     default:
       break;
@@ -731,7 +833,11 @@ void MgHandler::RequestPoll()
 void MgHandler::HandlePoll(mg_connection* nc, int ev, void* p)
 {
   MgHandler* origin = *((MgHandler**)p);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  if (nc->fn_data == origin)
+#else /* MG_VERSION_NUMBER */
   if (nc->user_data == origin)
+#endif /* MG_VERSION_NUMBER */
     origin->HandleEvent(MG_EV_POLL, NULL);
 }
 
@@ -776,7 +882,11 @@ int HttpDataSender::HandleEvent(int ev, void* p)
 {
   switch (ev)
   {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_WRITE:         // last transmission has finished
+#else /* MG_VERSION_NUMBER */
     case MG_EV_SEND:          // last transmission has finished
+#endif /* MG_VERSION_NUMBER */
     {
       if (m_sent == m_size && ++m_xfer < m_xferlist.size()) {
         // send next region:
@@ -788,15 +898,24 @@ int HttpDataSender::HandleEvent(int ev, void* p)
       if (m_sent < m_size) {
         // send next chunk:
         size_t len = MIN(m_size - m_sent, XFER_CHUNK_SIZE);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_http_write_chunk(m_nc, (const char*) m_data + m_sent, len);
+#else /* MG_VERSION_NUMBER */
         mg_send_http_chunk(m_nc, (const char*) m_data + m_sent, len);
+#endif /* MG_VERSION_NUMBER */
         m_sent += len;
         ESP_EARLY_LOGV(TAG, "HttpDataSender[%p] data=%p sent %d/%d", m_nc, m_data, m_sent, m_size);
       }
       else {
         // done:
         if (!m_keepalive)
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+          m_nc->is_draining = 1;
+        mg_http_write_chunk(m_nc, "", 0);
+#else /* MG_VERSION_NUMBER */
           m_nc->flags |= MG_F_SEND_AND_CLOSE;
         mg_send_http_chunk(m_nc, "", 0);
+#endif /* MG_VERSION_NUMBER */
         ESP_EARLY_LOGV(TAG, "HttpDataSender[%p]: done", m_nc);
         delete this;
       }
@@ -835,20 +954,33 @@ int HttpStringSender::HandleEvent(int ev, void* p)
 {
   switch (ev)
   {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_WRITE:         // last transmission has finished
+#else /* MG_VERSION_NUMBER */
     case MG_EV_SEND:          // last transmission has finished
+#endif /* MG_VERSION_NUMBER */
     {
       if (m_sent < m_msg->size()) {
         // send next chunk:
         size_t len = MIN(m_msg->size() - m_sent, XFER_CHUNK_SIZE);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_http_write_chunk(m_nc, (const char*) m_msg->data() + m_sent, len);
+#else /* MG_VERSION_NUMBER */
         mg_send_http_chunk(m_nc, (const char*) m_msg->data() + m_sent, len);
+#endif /* MG_VERSION_NUMBER */
         m_sent += len;
         ESP_EARLY_LOGV(TAG, "HttpStringSender[%p] msg=%p sent %d/%d", m_nc, m_msg, m_sent, m_msg->size());
       }
       else {
         // done:
         if (!m_keepalive)
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+          m_nc->is_draining = 1;
+        mg_http_write_chunk(m_nc, "", 0);
+#else /* MG_VERSION_NUMBER */
           m_nc->flags |= MG_F_SEND_AND_CLOSE;
         mg_send_http_chunk(m_nc, "", 0);
+#endif /* MG_VERSION_NUMBER */
         ESP_EARLY_LOGV(TAG, "HttpStringSender[%p]: done msg=%p, %d bytes sent", m_nc, m_msg, m_sent);
         delete this;
       }
@@ -880,25 +1012,46 @@ bool OvmsWebServer::CheckLogin(std::string username, std::string password)
  * GetSession: parses the session cookie and returns a pointer to the session struct
  * or NULL if not found.
  */
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+user_session* OvmsWebServer::GetSession(mg_http_message *hm)
+#else /* MG_VERSION_NUMBER */
 user_session* OvmsWebServer::GetSession(http_message *hm)
+#endif /* MG_VERSION_NUMBER */
 {
   user_session* session = NULL;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  struct mg_str *cookie_header = mg_http_get_header(hm, "cookie");
+#else /* MG_VERSION_NUMBER */
   struct mg_str *cookie_header = mg_get_http_header(hm, "cookie");
+#endif /* MG_VERSION_NUMBER */
   if (cookie_header == NULL) return NULL;
   char ssid_buf[21], *ssid = ssid_buf;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  struct mg_str ssid_mgstr = mg_str("");
+  ssid_mgstr = mg_http_get_header_var(*cookie_header, mg_str(SESSION_COOKIE_NAME));
+  memset(&ssid_buf, 0, sizeof(ssid_buf));
+  memcpy(&ssid_buf, ssid_mgstr.ptr, min(ssid_mgstr.len, sizeof(ssid_buf)));
+#else /* MG_VERSION_NUMBER */
   mg_http_parse_header2(cookie_header, SESSION_COOKIE_NAME, &ssid, sizeof(ssid_buf));
+#endif /* MG_VERSION_NUMBER */
   uint64_t sid = strtoull(ssid, NULL, 16);
   if (sid != 0) {
     for (int i = 0; i < NUM_SESSIONS; i++) {
       if (m_sessions[i].id == sid) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        m_sessions[i].last_used = time(NULL);
+#else /* MG_VERSION_NUMBER */
         m_sessions[i].last_used = mg_time();
+#endif /* MG_VERSION_NUMBER */
         session = &m_sessions[i];
         break;
       }
     }
   }
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
   if (ssid != ssid_buf)
     free(ssid);
+#endif /* MG_VERSION_NUMBER */
   return session;
 }
 
@@ -906,7 +1059,11 @@ user_session* OvmsWebServer::GetSession(http_message *hm)
 /**
  * CreateSession: create a new session
  */
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+user_session* OvmsWebServer::CreateSession(const mg_http_message *hm)
+#else /* MG_VERSION_NUMBER */
 user_session* OvmsWebServer::CreateSession(const http_message *hm)
+#endif /* MG_VERSION_NUMBER */
 {
   /* Find first available slot or use the oldest one. */
   user_session *s = NULL;
@@ -922,33 +1079,64 @@ user_session* OvmsWebServer::CreateSession(const http_message *hm)
   }
   if (s == NULL) {
     DestroySession(oldest_s);
-    ESP_LOGD(TAG, "CreateSession: evicted %" INT64_X_FMT, oldest_s->id);
+    ESP_LOGD(TAG, "CreateSession: evicted %" PRIx64, oldest_s->id);
     s = oldest_s;
   }
 
   /* Initialize new session. */
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  s->last_used = time(NULL);
+#else /* MG_VERSION_NUMBER */
   s->last_used = mg_time();
+#endif /* MG_VERSION_NUMBER */
 
   /* Create an ID by putting various volatiles into a pot and stirring. */
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_sha1_ctx ctx;
+  mg_sha1_init(&ctx);
+  mg_sha1_update(&ctx, (const unsigned char *) hm->message.ptr, hm->message.len);
+  mg_sha1_update(&ctx, (const unsigned char *) m_sessions, sizeof(m_sessions));
+#else /* MG_VERSION_NUMBER */
   cs_sha1_ctx ctx;
   cs_sha1_init(&ctx);
   cs_sha1_update(&ctx, (const unsigned char *) hm->message.p, hm->message.len);
   cs_sha1_update(&ctx, (const unsigned char *) m_sessions, sizeof(m_sessions));
+#endif /* MG_VERSION_NUMBER */
   std::string sys;
   sys = StdMetrics.ms_m_serial->AsString();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_sha1_update(&ctx, (const unsigned char *) sys.data(), sys.size());
+#else /* MG_VERSION_NUMBER */
   cs_sha1_update(&ctx, (const unsigned char *) sys.data(), sys.size());
+#endif /* MG_VERSION_NUMBER */
   sys = StdMetrics.ms_m_monotonic->AsString();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_sha1_update(&ctx, (const unsigned char *) sys.data(), sys.size());
+#else /* MG_VERSION_NUMBER */
   cs_sha1_update(&ctx, (const unsigned char *) sys.data(), sys.size());
+#endif /* MG_VERSION_NUMBER */
   sys = StdMetrics.ms_m_freeram->AsString();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_sha1_update(&ctx, (const unsigned char *) sys.data(), sys.size());
+#else /* MG_VERSION_NUMBER */
   cs_sha1_update(&ctx, (const unsigned char *) sys.data(), sys.size());
+#endif /* MG_VERSION_NUMBER */
   sys = StdMetrics.ms_v_bat_12v_voltage->AsString();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_sha1_update(&ctx, (const unsigned char *) sys.data(), sys.size());
+#else /* MG_VERSION_NUMBER */
   cs_sha1_update(&ctx, (const unsigned char *) sys.data(), sys.size());
+#endif /* MG_VERSION_NUMBER */
 
   union {
     uint64_t u64;
     unsigned char digest[20];
   } buf;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_sha1_final(buf.digest, &ctx);
+#else /* MG_VERSION_NUMBER */
   cs_sha1_final(buf.digest, &ctx);
+#endif /* MG_VERSION_NUMBER */
   s->id = buf.u64;
   return s;
 }
@@ -968,11 +1156,15 @@ void OvmsWebServer::DestroySession(user_session *s)
  */
 void OvmsWebServer::CheckSessions(void)
 {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  time_t threshold = time(NULL) - SESSION_TTL;
+#else /* MG_VERSION_NUMBER */
   time_t threshold = mg_time() - SESSION_TTL;
+#endif /* MG_VERSION_NUMBER */
   for (int i = 0; i < NUM_SESSIONS; i++) {
     user_session *s = &m_sessions[i];
     if (s->id != 0 && s->last_used < threshold) {
-      ESP_LOGD(TAG, "CheckSessions: session %" INT64_X_FMT " closed due to idleness.", s->id);
+      ESP_LOGD(TAG, "CheckSessions: session %" PRIx64 " closed due to idleness.", s->id);
       DestroySession(s);
     }
   }
@@ -1022,7 +1214,7 @@ void OvmsWebServer::HandleLogin(PageEntry_t& p, PageContext_t& c)
       snprintf(shead, sizeof(shead),
         "Content-Type: text/html; charset=utf-8\r\n"
         "Cache-Control: no-cache\r\n"
-        "Set-Cookie: %s=%" INT64_X_FMT "; path=/"
+        "Set-Cookie: %s=%" PRIx64 "; path=/"
         , SESSION_COOKIE_NAME, s->id);
       c.head(200, shead);
       c.printf(
@@ -1030,7 +1222,7 @@ void OvmsWebServer::HandleLogin(PageEntry_t& p, PageContext_t& c)
         , c.uri.c_str());
       c.done();
 
-      ESP_LOGI(TAG, "HandleLogin: '%s' logged in, sid %" INT64_X_FMT, username.c_str(), s->id);
+      ESP_LOGI(TAG, "HandleLogin: '%s' logged in, sid %" PRIx64, username.c_str(), s->id);
       return;
     }
 
@@ -1070,7 +1262,7 @@ void OvmsWebServer::HandleLogout(PageEntry_t& p, PageContext_t& c)
 {
   user_session *s = MyWebServer.GetSession(c.hm);
   if (s != NULL) {
-    ESP_LOGI(TAG, "HandleLogout: session %" INT64_X_FMT " destroyed", s->id);
+    ESP_LOGI(TAG, "HandleLogout: session %" PRIx64 " destroyed", s->id);
     MyWebServer.DestroySession(s);
   }
 
