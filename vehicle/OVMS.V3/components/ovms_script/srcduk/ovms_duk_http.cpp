@@ -53,6 +53,7 @@ static const char *TAG = "ovms-duk-http";
 #if CONFIG_MG_ENABLE_SSL
 #include "ovms_tls.h"
 #endif
+#include "mg_version.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // DuktapeHTTPRequest
@@ -105,8 +106,13 @@ class DuktapeHTTPRequest : public DuktapeObject
     bool StartRequest(duk_context *ctx=NULL);
 
   public:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    static void MongooseCallbackEntry(struct mg_connection *nc, int ev, void *ev_data, void *fn_data);
+    void MongooseCallback(struct mg_connection *nc, int ev, void *ev_data, void *fn_data);
+#else /* MG_VERSION_NUMBER */
     static void MongooseCallbackEntry(struct mg_connection *nc, int ev, void *ev_data);
     void MongooseCallback(struct mg_connection *nc, int ev, void *ev_data);
+#endif /* MG_VERSION_NUMBER */
 
   public:
     duk_ret_t CallMethod(duk_context *ctx, const char* method, void* data=NULL);
@@ -229,15 +235,25 @@ bool DuktapeHTTPRequest::StartRequest(duk_context *ctx /*=NULL*/)
   // create connection:
   m_mgconn = NULL;
   struct mg_mgr* mgr = MyNetManager.GetMongooseMgr();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  struct mg_tls_opts opts = {};
+#else /* MG_VERSION_NUMBER */
   struct mg_connect_opts opts = {};
   opts.user_data = this;
   const char* err;
   opts.error_string = &err;
+#endif /* MG_VERSION_NUMBER */
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  if (mg_url_is_ssl(m_url.c_str()))
+#else /* MG_VERSION_NUMBER */
   if (startsWith(m_url, "https://"))
+#endif /* MG_VERSION_NUMBER */
     {
     #if MG_ENABLE_SSL
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
       opts.ssl_ca_cert = MyOvmsTLS.GetTrustedList();
+#endif /* MG_VERSION_NUMBER */
     #else
       m_error = "SSL support disabled";
       ESP_LOGD(TAG, "DuktapeHTTPRequest: connect to '%s' failed: %s", m_url.c_str(), m_error.c_str());
@@ -246,20 +262,43 @@ bool DuktapeHTTPRequest::StartRequest(duk_context *ctx /*=NULL*/)
     #endif
     }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_connect(mgr, m_url.c_str(), MongooseCallbackEntry, this);
+#else /* MG_VERSION_NUMBER */
   m_mgconn = mg_connect_http_opt(mgr, MongooseCallbackEntry, opts,
     m_url.c_str(), m_headers.c_str(), m_ispost ? m_post.c_str() : NULL);
+#endif /* MG_VERSION_NUMBER */
 
   if (!m_mgconn)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    ESP_LOGD(TAG, "DuktapeHTTPRequest: connect to '%s' failed", m_url.c_str());
+    m_error = "unknown";
+#else /* MG_VERSION_NUMBER */
     ESP_LOGD(TAG, "DuktapeHTTPRequest: connect to '%s' failed: %s", m_url.c_str(), err);
     m_error = (err && *err) ? err : "unknown";
+#endif /* MG_VERSION_NUMBER */
     CallMethod(ctx, "fail");
     return false;
     }
 
+    #if MG_ENABLE_SSL
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  if (mg_url_is_ssl(m_url.c_str()))
+    {
+    struct mg_str host = mg_url_host(m_url.c_str());
+    opts.ca = MyOvmsTLS.GetTrustedList();
+    opts.srvname = host;
+    mg_tls_init(m_mgconn, &opts);
+    }
+#endif /* MG_VERSION_NUMBER */
+    #endif
+
   // connection created:
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
   if (m_timeout > 0)
     mg_set_timer(m_mgconn, mg_time() + (double)m_timeout / 1000);
+#endif /* MG_VERSION_NUMBER */
   return true;
   }
 
@@ -268,8 +307,13 @@ DuktapeHTTPRequest::~DuktapeHTTPRequest()
   // ESP_LOGD(TAG, "~DuktapeHTTPRequest");
   if (m_mgconn)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    m_mgconn->fn_data = NULL;
+    m_mgconn->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
     m_mgconn->user_data = NULL;
     m_mgconn->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
     m_mgconn = NULL;
     }
   }
@@ -282,18 +326,58 @@ duk_ret_t DuktapeHTTPRequest::Create(duk_context *ctx)
   return 1;
   }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+void DuktapeHTTPRequest::MongooseCallbackEntry(struct mg_connection *nc, int ev, void *ev_data, void *fn_data)
+  {
+  DuktapeHTTPRequest* me = (DuktapeHTTPRequest*)fn_data;
+  if (me) me->MongooseCallback(nc, ev, ev_data, fn_data);
+  }
+#else /* MG_VERSION_NUMBER */
 void DuktapeHTTPRequest::MongooseCallbackEntry(struct mg_connection *nc, int ev, void *ev_data)
   {
   DuktapeHTTPRequest* me = (DuktapeHTTPRequest*)nc->user_data;
   if (me) me->MongooseCallback(nc, ev, ev_data);
   }
+#endif /* MG_VERSION_NUMBER */
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+void DuktapeHTTPRequest::MongooseCallback(struct mg_connection *nc, int ev, void *ev_data, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 void DuktapeHTTPRequest::MongooseCallback(struct mg_connection *nc, int ev, void *ev_data)
+#endif /* MG_VERSION_NUMBER */
   {
   OvmsRecMutexLock lock(&m_mutex);
   if (nc != m_mgconn) return; // ignore events of previous connections
   switch (ev)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_CONNECT:
+      {
+      struct mg_str host = mg_url_host(m_url.c_str());
+      mg_printf(nc,
+              "%s %s HTTP/1.1\r\n"
+              "Host: %.*s\r\n"
+              "Content-Length: %u\r\n"
+              "%s\r\n%s",
+              m_ispost ? "POST" :  "GET", mg_url_uri(m_url.c_str()),
+              (int) host.len, host.ptr,
+              strlen(m_post.c_str()),
+              m_headers.c_str(),
+              m_ispost ? m_post.c_str() : NULL
+              );
+      }
+      break;
+
+    case MG_EV_ERROR:
+      {
+      char* errdesc = (char *)ev_data;
+      ESP_LOGD(TAG, "DuktapeHTTPRequest: MG_EV_CONNECT err=%s", errdesc);
+      m_error = errdesc;
+      RequestCallback("fail");
+      nc->is_closing = 1;
+      }
+      break;
+#else /* MG_VERSION_NUMBER */
     case MG_EV_CONNECT:
       {
       int err = *(int*) ev_data;
@@ -312,16 +396,43 @@ void DuktapeHTTPRequest::MongooseCallback(struct mg_connection *nc, int ev, void
         }
       }
       break;
+#endif /* MG_VERSION_NUMBER */
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_HTTP_MSG:
+#else /* MG_VERSION_NUMBER */
     case MG_EV_HTTP_REPLY:
+#endif /* MG_VERSION_NUMBER */
       {
       // response is complete, store:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      struct mg_http_message *hm = (struct mg_http_message*) ev_data;
+      m_response_status = mg_http_status(hm);
+      m_response_statusmsg.assign(hm->proto.ptr, hm->proto.len);
+      ESP_LOGD(TAG, "DuktapeHTTPRequest: MG_EV_HTTP_MSG status=%d bodylen=%d", m_response_status, hm->body.len);
+#else /* MG_VERSION_NUMBER */
       http_message *hm = (http_message*) ev_data;
-      ESP_LOGD(TAG, "DuktapeHTTPRequest: MG_EV_HTTP_REPLY status=%d bodylen=%d", hm->resp_code, hm->body.len);
       m_response_status = hm->resp_code;
       m_response_statusmsg.assign(hm->resp_status_msg.p, hm->resp_status_msg.len);
+      ESP_LOGD(TAG, "DuktapeHTTPRequest: MG_EV_HTTP_REPLY status=%d bodylen=%d", m_response_status, hm->body.len);
+#endif /* MG_VERSION_NUMBER */
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      m_response_body.assign(hm->body.ptr, hm->body.len);
+#else /* MG_VERSION_NUMBER */
       m_response_body.assign(hm->body.p, hm->body.len);
+#endif /* MG_VERSION_NUMBER */
       extram::string key, val, location;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      size_t i, max = sizeof(hm->headers) / sizeof(hm->headers[0]);
+      for (i = 0; i < max && hm->headers[i].name.len > 0; i++)
+        {
+        struct mg_str *k = &hm->headers[i].name, *v = &hm->headers[i].value;
+        key.assign(k->ptr, k->len);
+        val.assign(v->ptr, v->len);
+        m_response_headers.push_back(std::make_pair(key, val));
+        if (strcasecmp(key.c_str(), "Location") == 0) location = val;
+        }
+#else /* MG_VERSION_NUMBER */
       for (int i = 0; i < MG_MAX_HTTP_HEADERS && hm->header_names[i].len > 0; i++)
         {
         key.assign(hm->header_names[i].p, hm->header_names[i].len);
@@ -329,6 +440,7 @@ void DuktapeHTTPRequest::MongooseCallback(struct mg_connection *nc, int ev, void
         m_response_headers.push_back(std::make_pair(key, val));
         if (strcasecmp(key.c_str(), "Location") == 0) location = val;
         }
+#endif /* MG_VERSION_NUMBER */
 
       // follow redirect?
       if (m_response_status == 301 || m_response_status == 302)
@@ -360,10 +472,56 @@ void DuktapeHTTPRequest::MongooseCallback(struct mg_connection *nc, int ev, void
         RequestCallback("done");
         }
       // in any case, this connection is done:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      nc->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
       nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
       }
       break;
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_OPEN:
+      {
+      ESP_LOGD(TAG, "DuktapeHTTPRequest: MG_EV_OPEN");
+      // Connection created. Store connect expiration time in c->data
+      if (m_timeout > 0)
+        {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 9, 0)
+        *(uint64_t *) nc->data = mg_millis() + m_timeout;
+#else /* MG_VERSION_NUMBER */
+        *(uint64_t *) nc->label = mg_millis() + m_timeout;
+#endif /* MG_VERSION_NUMBER */
+        }
+      else
+        {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 9, 0)
+        memset(&nc->data, 0, MG_DATA_SIZE);
+#else /* MG_VERSION_NUMBER */
+        memset(&nc->label, 0, 50);
+#endif /* MG_VERSION_NUMBER */
+        }
+      }
+      break;
+
+    case MG_EV_POLL:
+      {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 9, 0)
+      if (((nc->data)[0] != 0) && (mg_millis() > *(uint64_t *) nc->data) &&
+#else /* MG_VERSION_NUMBER */
+      if (((nc->label)[0] != 0) && (mg_millis() > *(uint64_t *) nc->label) &&
+#endif /* MG_VERSION_NUMBER */
+          (nc->is_connecting || nc->is_resolving))
+        {
+        ESP_LOGD(TAG, "DuktapeHTTPRequest: MG_EV_POLL");
+        m_error = "timeout";
+        RequestCallback("fail");
+        nc->is_closing = 1;
+        // mg_error(c, "Connect timeout");
+        }
+      break;
+      }
+#else /* MG_VERSION_NUMBER */
     case MG_EV_TIMER:
       {
       ESP_LOGD(TAG, "DuktapeHTTPRequest: MG_EV_TIMER");
@@ -372,6 +530,7 @@ void DuktapeHTTPRequest::MongooseCallback(struct mg_connection *nc, int ev, void
       nc->flags |= MG_F_CLOSE_IMMEDIATELY;
       }
       break;
+#endif /* MG_VERSION_NUMBER */
 
     case MG_EV_CLOSE:
       {
@@ -386,7 +545,11 @@ void DuktapeHTTPRequest::MongooseCallback(struct mg_connection *nc, int ev, void
         ESP_LOGD(TAG, "DuktapeHTTPRequest: MG_EV_CLOSE status=%d", m_response_status);
         }
       // Mongoose part done:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      nc->fn_data = NULL;
+#else /* MG_VERSION_NUMBER */
       nc->user_data = NULL;
+#endif /* MG_VERSION_NUMBER */
       m_mgconn = NULL;
       Unref();
       }
