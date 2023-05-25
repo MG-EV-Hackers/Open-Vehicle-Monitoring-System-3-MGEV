@@ -58,6 +58,7 @@
 #include <wolfssh/log.h>
 #include <wolfssh/internal.h>
 #include "console_ssh.h"
+#include "mg_version.h"
 
 static void wolfssh_logger(enum wolfSSH_LogLevel level, const char* const msg);
 static void wolfssl_logger(int level, const char* const msg);
@@ -76,7 +77,11 @@ static const char newline = '\n';
 
 OvmsSSH MySSH __attribute__ ((init_priority (8300)));
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+static void MongooseHandler(struct mg_connection *nc, int ev, void *p, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 static void MongooseHandler(struct mg_connection *nc, int ev, void *p)
+#endif /* MG_VERSION_NUMBER */
   {
   MySSH.EventHandler(nc, ev, p);
   }
@@ -85,18 +90,41 @@ void OvmsSSH::EventHandler(struct mg_connection *nc, int ev, void *p)
   {
   switch (ev)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_OPEN:
+      {
+      if (nc->is_listening)
+        {
+        ESP_LOGI(tag, "LLA: MG_EV_OPEN, conn %p, data %p : SERVER is listening", nc, p);
+        }
+      break;
+      }
+    case MG_EV_ERROR:
+      {
+      ESP_LOGE(tag, "LLA: MG_EV_OPEN, conn %p, data %p : Error: %s", nc, p, (char *) p);
+      break;
+      }
+#endif /* MG_VERSION_NUMBER */
     case MG_EV_ACCEPT:
       {
       ESP_EARLY_LOGV(tag, "Event MG_EV_ACCEPT conn %p, data %p", nc, p);
       ConsoleSSH* child = new ConsoleSSH(this, nc);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      nc->fn_data = child;
+#else /* MG_VERSION_NUMBER */
       nc->user_data = child;
+#endif /* MG_VERSION_NUMBER */
       break;
       }
 
     case MG_EV_POLL:
       {
       //ESP_EARLY_LOGV(tag, "Event MG_EV_ACCEPT conn %p, data %p", nc, p);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      ConsoleSSH* child = (ConsoleSSH*)nc->fn_data;
+#else /* MG_VERSION_NUMBER */
       ConsoleSSH* child = (ConsoleSSH*)nc->user_data;
+#endif /* MG_VERSION_NUMBER */
       if (child)
         {
         child->Send();
@@ -123,18 +151,34 @@ void OvmsSSH::EventHandler(struct mg_connection *nc, int ev, void *p)
       }
       break;
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_READ:
+#else /* MG_VERSION_NUMBER */
     case MG_EV_RECV:
+#endif /* MG_VERSION_NUMBER */
       {
       ESP_EARLY_LOGV(tag, "Event MG_EV_RECV conn %p, data received %d", nc, *(int*)p);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      ConsoleSSH* child = (ConsoleSSH*)nc->fn_data;
+#else /* MG_VERSION_NUMBER */
       ConsoleSSH* child = (ConsoleSSH*)nc->user_data;
+#endif /* MG_VERSION_NUMBER */
       child->Receive();
       }
       break;
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_WRITE:
+#else /* MG_VERSION_NUMBER */
     case MG_EV_SEND:
+#endif /* MG_VERSION_NUMBER */
       {
       ESP_EARLY_LOGV(tag, "Event MG_EV_SEND conn %p, data %p", nc, p);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      ConsoleSSH* child = (ConsoleSSH*)nc->fn_data;
+#else /* MG_VERSION_NUMBER */
       ConsoleSSH* child = (ConsoleSSH*)nc->user_data;
+#endif /* MG_VERSION_NUMBER */
       child->Sent();
       break;
       }
@@ -142,7 +186,11 @@ void OvmsSSH::EventHandler(struct mg_connection *nc, int ev, void *p)
     case MG_EV_CLOSE:
       {
       ESP_EARLY_LOGV(tag, "Event MG_EV_CLOSE conn %p, data %p", nc, p);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      ConsoleSSH* child = (ConsoleSSH*)nc->fn_data;
+#else /* MG_VERSION_NUMBER */
       ConsoleSSH* child = (ConsoleSSH*)nc->user_data;
+#endif /* MG_VERSION_NUMBER */
       if (child)
         delete child;
       }
@@ -219,9 +267,17 @@ void OvmsSSH::NetManInit(std::string event, void* data)
     }
 
   struct mg_mgr* mgr = MyNetManager.GetMongooseMgr();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_connection* nc = mg_listen(mgr, ":22", MongooseHandler, NULL);
+#else /* MG_VERSION_NUMBER */
   mg_connection* nc = mg_bind(mgr, ":22", MongooseHandler);
+#endif /* MG_VERSION_NUMBER */
   if (nc)
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    nc->fn_data = NULL;
+#else /* MG_VERSION_NUMBER */
     nc->user_data = NULL;
+#endif /* MG_VERSION_NUMBER */
   else
     ESP_LOGE(tag, "Launching SSH Server failed");
   }
@@ -346,8 +402,13 @@ void ConsoleSSH::Receive()
   else
     {
     ESP_EARLY_LOGE(tag, "Timeout queueing message in ConsoleSSH::Receive\n");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    struct mg_iobuf* io = &m_connection->recv;
+    io->len = 0;
+#else /* MG_VERSION_NUMBER */
     mbuf *io = &m_connection->recv_mbuf;
     mbuf_remove(io, io->len);
+#endif /* MG_VERSION_NUMBER */
     }
   }
 
@@ -356,7 +417,11 @@ void ConsoleSSH::Send()
   {
   if (m_state != SOURCE_SEND || !m_sent)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    if (m_drain > 0 && m_connection->send.len == 0)
+#else /* MG_VERSION_NUMBER */
     if (m_drain > 0 && m_connection->send_mbuf.len == 0)
+#endif /* MG_VERSION_NUMBER */
       write("", 0);       // Wake up output after draining
     return;
     }
@@ -388,13 +453,21 @@ void ConsoleSSH::Send()
     // return EWOUDBLOCK
     ESP_EARLY_LOGE(tag, "Error %d in wolfSSH_stream_send: %s", ret, GetErrorString(ret));
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    m_connection->is_draining = 1;
+#else /* MG_VERSION_NUMBER */
     m_connection->flags |= MG_F_SEND_AND_CLOSE;
+#endif /* MG_VERSION_NUMBER */
     m_state = CLOSING;
     }
   else if (m_size < 0)
     {
     ESP_EARLY_LOGE(tag, "Error %d reading file in source scp: %s", m_size, strerror(m_size));
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    m_connection->is_draining = 1;
+#else /* MG_VERSION_NUMBER */
     m_connection->flags |= MG_F_SEND_AND_CLOSE;
+#endif /* MG_VERSION_NUMBER */
     m_state = CLOSING;
     }
   else  // EOF on fread()
@@ -903,7 +976,11 @@ void ConsoleSSH::HandleDeviceEvent(void* pEvent)
     return;
     }
   ESP_LOGE(tag, "Error %d in reception: %s", rc, GetErrorString(rc));
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  m_connection->is_draining = 1;
+#else /* MG_VERSION_NUMBER */
   m_connection->flags |= MG_F_SEND_AND_CLOSE;
+#endif /* MG_VERSION_NUMBER */
   }
 
 // This is called to shut down the SSH connection when the "exit" command is input.
@@ -944,13 +1021,21 @@ int ConsoleSSH::printf(const char* fmt, ...)
 
 ssize_t ConsoleSSH::write(const void *buf, size_t nbyte)
   {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  if (!m_ssh || (m_connection->is_draining))
+#else /* MG_VERSION_NUMBER */
   if (!m_ssh || (m_connection->flags & MG_F_SEND_AND_CLOSE))
+#endif /* MG_VERSION_NUMBER */
     return 0;
 
   int ret = 0;
   if (m_drain > 0)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    if (m_connection->send.len > 0)
+#else /* MG_VERSION_NUMBER */
     if (m_connection->send_mbuf.len > 0)
+#endif /* MG_VERSION_NUMBER */
       {
       m_drain += nbyte;
       return 0;
@@ -1021,7 +1106,11 @@ ssize_t ConsoleSSH::write(const void *buf, size_t nbyte)
     else
       {
       ESP_LOGE(tag, "wolfSSH_stream_send returned %d: %s", ret, GetErrorString(ret));
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      m_connection->is_draining = 1;
+#else /* MG_VERSION_NUMBER */
       m_connection->flags |= MG_F_SEND_AND_CLOSE;
+#endif /* MG_VERSION_NUMBER */
       }
     }
   else
@@ -1040,25 +1129,39 @@ int RecvCallback(WOLFSSH* ssh, void* data, word32 size, void* ctx)
 
 int ConsoleSSH::RecvCallback(char* buf, uint32_t size)
   {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  struct mg_iobuf* io = &m_connection->recv;
+#else /* MG_VERSION_NUMBER */
   mbuf *io = &m_connection->recv_mbuf;
+#endif /* MG_VERSION_NUMBER */
   size_t len = io->len;
   if (size < len)
     len = size;
   else if (len == 0)
     return WS_CBIO_ERR_WANT_READ;       // No more data available
   memcpy(buf, io->buf, len);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  io->len = 0;
+#else /* MG_VERSION_NUMBER */
   mbuf_remove(io, len);
+#endif /* MG_VERSION_NUMBER */
   return len;
   }
 
 int SendCallback(WOLFSSH* ssh, void* data, word32 size, void* ctx)
   {
   mg_connection* nc = (mg_connection*)ctx;
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
   nc->flags |= MG_F_SEND_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
   size_t ret = mg_send(nc, (char*)data, size);
   if (ret == 0)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    if (!((ConsoleSSH*)nc->fn_data)->IsDraining())
+#else /* MG_VERSION_NUMBER */
     if (!((ConsoleSSH*)nc->user_data)->IsDraining())
+#endif /* MG_VERSION_NUMBER */
       {
       size_t free8 = heap_caps_get_free_size(MALLOC_CAP_8BIT|MALLOC_CAP_INTERNAL);
       ESP_LOGW(tag, "send blocked on %u-byte packet: low free memory %zu", size, free8);
