@@ -144,7 +144,11 @@ void HttpCommandStream::ProcessQueue()
   if (m_writequeue) {
     while (txlen < XFER_CHUNK_SIZE && xQueueReceive(m_writequeue, &wbuf, 0) == pdTRUE) {
       if (m_nc) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_http_write_chunk(m_nc, wbuf.data, wbuf.len);
+#else /* MG_VERSION_NUMBER */
         mg_send_http_chunk(m_nc, wbuf.data, wbuf.len);
+#endif /* MG_VERSION_NUMBER */
         txlen += wbuf.len;
       }
       free(wbuf.data);
@@ -161,9 +165,19 @@ void HttpCommandStream::ProcessQueue()
     ESP_EARLY_LOGD(TAG, "HttpCommandStream[%p] DONE, %d bytes sent, %d bytes free",
       m_nc, m_sent, heap_caps_get_free_size(MALLOC_CAP_8BIT));
     if (m_nc) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      m_nc->is_draining = 1; // necessary to prevent mg_broadcast lockups
+#else /* MG_VERSION_NUMBER */
       m_nc->flags |= MG_F_SEND_AND_CLOSE; // necessary to prevent mg_broadcast lockups
+#endif /* MG_VERSION_NUMBER */
+
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      mg_http_write_chunk(m_nc, "", 0);
+      m_nc->fn_data = NULL;
+#else /* MG_VERSION_NUMBER */
       mg_send_http_chunk(m_nc, "", 0);
       m_nc->user_data = NULL;
+#endif /* MG_VERSION_NUMBER */
       m_nc = NULL;
     }
   }
@@ -182,7 +196,11 @@ int HttpCommandStream::HandleEvent(int ev, void* p)
         ProcessQueue();
       break;
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_WRITE:
+#else /* MG_VERSION_NUMBER */
     case MG_EV_SEND:
+#endif /* MG_VERSION_NUMBER */
       // last transmission has finished:
       ESP_EARLY_LOGV(TAG, "HttpCommandStream[%p] EV_SEND qlen=%d done=%d sent=%d ack=%d",
         m_nc, m_writequeue ? uxQueueMessagesWaiting(m_writequeue) : -1, m_done, m_sent, m_ack);
@@ -196,7 +214,11 @@ int HttpCommandStream::HandleEvent(int ev, void* p)
       // connection has been closed, possibly externally:
       // we need to let the command task finish normally to prevent problems
       // due to lost/locked ressources, so we just detach:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      m_nc->fn_data = NULL;
+#else /* MG_VERSION_NUMBER */
       m_nc->user_data = NULL;
+#endif /* MG_VERSION_NUMBER */
       m_nc = NULL;
       ProcessQueue();   // empty queue (no tx) to prevent task lockup on write
       ev = 0;           // prevent deletion by main event handler
