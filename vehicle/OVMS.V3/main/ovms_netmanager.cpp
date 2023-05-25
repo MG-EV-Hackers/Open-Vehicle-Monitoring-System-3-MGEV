@@ -47,6 +47,7 @@ static const char *TAG = "netmanager";
 #ifdef CONFIG_OVMS_DEV_NETMANAGER_PING
 #include "ping/ping_sock.h"
 #endif // CONFIG_OVMS_DEV_NETMANAGER_PING
+#include "mg_version.h"
 
 #ifndef CONFIG_OVMS_NETMAN_TASK_PRIORITY
 #define CONFIG_OVMS_NETMAN_TASK_PRIORITY 5
@@ -909,7 +910,11 @@ void OvmsNetManager::MongooseTask()
 
   // Initialise the mongoose manager
   ESP_LOGD(TAG, "MongooseTask starting");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_mgr_init(&m_mongoose_mgr);
+#else /* MG_VERSION_NUMBER */
   mg_mgr_init(&m_mongoose_mgr, NULL);
+#endif /* MG_VERSION_NUMBER */
   MyEvents.SignalEvent("network.mgr.init",NULL);
 
   m_mongoose_running = true;
@@ -918,11 +923,15 @@ void OvmsNetManager::MongooseTask()
   while (m_mongoose_running)
     {
     // poll interfaces:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    mg_mgr_poll(&m_mongoose_mgr, 250);
+#else /* MG_VERSION_NUMBER */
     if (mg_mgr_poll(&m_mongoose_mgr, 250) == 0)
       {
       ESP_LOGD(TAG, "MongooseTask: no interfaces available => exit");
       break;
       }
+#endif /* MG_VERSION_NUMBER */
 
     // check for netmanager control jobs:
     ProcessJobs();
@@ -1052,6 +1061,21 @@ int OvmsNetManager::ListConnections(int verbosity, OvmsWriter* writer)
   mg_connection *c;
   int cnt = 0;
   char local[48], remote[48];
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  writer->printf("ID        Handler   Local                  Remote\n");
+  for (c = m_mongoose_mgr.conns; c != NULL; c = c->next)
+    {
+    if (c->is_listening)
+      continue;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+    mg_snprintf(local, sizeof(local), "%M", mg_print_ip_port, &c->loc);
+    mg_snprintf(remote, sizeof(remote), "%M", mg_print_ip_port, &c->rem);
+#else /* MG_VERSION_NUMBER */
+    mg_snprintf(local, sizeof(local), "%I:%hu", c->loc.is_ip6 ? 16 : 4, c->loc.is_ip6 ? &c->loc.ip6 : (void *) &c->loc.ip, mg_ntohs(c->loc.port));
+    mg_snprintf(remote, sizeof(remote), "%I:%hu", c->rem.is_ip6 ? 16 : 4, c->rem.is_ip6 ? &c->rem.ip6 : (void *) &c->rem.ip, mg_ntohs(c->rem.port));
+#endif /* MG_VERSION_NUMBER */
+    writer->printf("%08" PRIx32 "  %08" PRIx32 "  %-21s  %s\n", (uint32_t)c, (uint32_t)c->fn_data, local, remote);
+#else /* MG_VERSION_NUMBER */
   writer->printf("ID        Flags     Handler   Local                  Remote\n");
   for (c = mg_next(&m_mongoose_mgr, NULL); c; c = mg_next(&m_mongoose_mgr, c))
     {
@@ -1060,6 +1084,7 @@ int OvmsNetManager::ListConnections(int verbosity, OvmsWriter* writer)
     mg_conn_addr_to_str(c, local, sizeof(local), MG_SOCK_STRINGIFY_IP|MG_SOCK_STRINGIFY_PORT);
     mg_conn_addr_to_str(c, remote, sizeof(remote), MG_SOCK_STRINGIFY_IP|MG_SOCK_STRINGIFY_PORT|MG_SOCK_STRINGIFY_REMOTE);
     writer->printf("%08" PRIx32 "  %08" PRIx32 "  %08" PRIx32 "  %-21s  %s\n", (uint32_t)c, (uint32_t)c->flags, (uint32_t)c->user_data, local, remote);
+#endif /* MG_VERSION_NUMBER */
     cnt++;
     }
   return cnt;
@@ -1071,18 +1096,40 @@ int OvmsNetManager::CloseConnection(uint32_t id)
     return 0;
   mg_connection *c;
   int cnt = 0;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  for (c = m_mongoose_mgr.conns; c != NULL; c = c->next)
+#else /* MG_VERSION_NUMBER */
   for (c = mg_next(&m_mongoose_mgr, NULL); c; c = mg_next(&m_mongoose_mgr, c))
+#endif /* MG_VERSION_NUMBER */
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    if (c->is_listening)
+#else /* MG_VERSION_NUMBER */
     if (c->flags & MG_F_LISTENING)
+#endif /* MG_VERSION_NUMBER */
       continue;
     if (id == 0 || c == (mg_connection*)id)
       {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      c->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
       c->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
       cnt++;
       }
     }
   return cnt;
   }
+
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+union socket_address {
+  struct sockaddr sa;
+  struct sockaddr_in sin;
+#if MG_ENABLE_IPV6
+  struct sockaddr_in6 sin6;
+#endif
+};
+#endif /* MG_VERSION_NUMBER */
 
 int OvmsNetManager::CleanupConnections()
   {
@@ -1122,14 +1169,28 @@ int OvmsNetManager::CleanupConnections()
     }
 #endif // #ifdef CONFIG_OVMS_COMP_WIFI
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  for (c = m_mongoose_mgr.conns; c != NULL; c = c->next)
+#else /* MG_VERSION_NUMBER */
   for (c = mg_next(&m_mongoose_mgr, NULL); c; c = mg_next(&m_mongoose_mgr, c))
+#endif /* MG_VERSION_NUMBER */
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    if (c->is_listening)
+#else /* MG_VERSION_NUMBER */
     if (c->flags & MG_F_LISTENING)
+#endif /* MG_VERSION_NUMBER */
       continue;
 
     // get local address:
     memset(&sa, 0, sizeof(sa));
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 9, 0)
+    if (getsockname((MG_SOCKET_TYPE) (size_t) c->fd, &sa.sa, &slen) != 0)
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    if (getsockname((int) (size_t) c->fd, &sa.sa, &slen) != 0)
+#else /* MG_VERSION_NUMBER */
     if (getsockname(c->sock, &sa.sa, &slen) != 0)
+#endif /* MG_VERSION_NUMBER */
       {
       ESP_LOGW(TAG, "CleanupConnections: conn %08" PRIx32 ": getsockname failed", (uint32_t)c);
       continue;
@@ -1153,7 +1214,11 @@ int OvmsNetManager::CleanupConnections()
     if (!ni || !(ni->flags & NETIF_FLAG_UP) || !(ni->flags & NETIF_FLAG_LINK_UP))
       {
       ESP_LOGI(TAG, "CleanupConnections: closing conn %08" PRIx32 ": interface/link down", (uint32_t)c);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      c->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
       c->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
       cnt++;
       continue;
       }
@@ -1162,7 +1227,13 @@ int OvmsNetManager::CleanupConnections()
     if (ni->name[0] == 'a' && ni->name[1] == 'p')
       {
       memset(&sa, 0, sizeof(sa));
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 9, 0)
+      if (getpeername((MG_SOCKET_TYPE) (size_t) c->fd, &sa.sa, &slen) != 0)
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      if (getpeername((int) (size_t) c->fd, &sa.sa, &slen) != 0)
+#else /* MG_VERSION_NUMBER */
       if (getpeername(c->sock, &sa.sa, &slen) != 0)
+#endif /* MG_VERSION_NUMBER */
         {
         ESP_LOGW(TAG, "CleanupConnections: conn %08" PRIx32 ": getpeername failed", (uint32_t)c);
         continue;
@@ -1181,7 +1252,11 @@ int OvmsNetManager::CleanupConnections()
       else
         {
         ESP_LOGI(TAG, "CleanupConnections: closing conn %08" PRIx32 ": AP peer disconnected", (uint32_t)c);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        c->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
         c->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
         cnt++;
         }
       } // AP remotes
