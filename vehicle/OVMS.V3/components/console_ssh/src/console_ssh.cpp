@@ -404,7 +404,7 @@ void ConsoleSSH::Receive()
     ESP_EARLY_LOGE(tag, "Timeout queueing message in ConsoleSSH::Receive\n");
 #if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
     struct mg_iobuf* io = &m_connection->recv;
-    io->len = 0;
+    mg_iobuf_del(io, 0, io->len);
 #else /* MG_VERSION_NUMBER */
     mbuf *io = &m_connection->recv_mbuf;
     mbuf_remove(io, io->len);
@@ -714,8 +714,8 @@ void ConsoleSSH::HandleDeviceEvent(void* pEvent)
         rc = GetResponse();
         if (rc < 1)
           break;
-	if (m_state == SOURCE_SEND)
-	    ESP_LOGW(tag, "RECV not expected in SOURCE_SEND state");
+        if (m_state == SOURCE_SEND)
+          ESP_LOGW(tag, "RECV not expected in SOURCE_SEND state");
         if (m_buffer[0] == '\1')
           {
           ESP_LOGW(tag, "Source: %s", &m_buffer[1]);
@@ -1141,7 +1141,7 @@ int ConsoleSSH::RecvCallback(char* buf, uint32_t size)
     return WS_CBIO_ERR_WANT_READ;       // No more data available
   memcpy(buf, io->buf, len);
 #if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
-  io->len = 0;
+  mg_iobuf_del(io, 0, len);
 #else /* MG_VERSION_NUMBER */
   mbuf_remove(io, len);
 #endif /* MG_VERSION_NUMBER */
@@ -1283,6 +1283,9 @@ static void wolfssh_logger(enum wolfSSH_LogLevel level, const char* const msg)
     case WS_LOG_SFTP:
     case WS_LOG_USER:
     case WS_LOG_ERROR:
+#if LIBWOLFSSH_VERSION_HEX >= 0x01004012
+    case WS_LOG_CERTMAN:
+#endif
       ESP_LOGE(wolfssh_tag, "%s", msg);
       break;
 
