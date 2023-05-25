@@ -147,9 +147,15 @@ std::string PageContext::getvar(const std::string& name, size_t maxlen /*=200*/)
   if (!varbuf)
     return res;
   if (method == "POST")
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    mg_http_get_var(&hm->body, name.c_str(), varbuf, maxlen);
+  else
+    mg_http_get_var(&hm->query, name.c_str(), varbuf, maxlen);
+#else /* MG_VERSION_NUMBER */
     mg_get_http_var(&hm->body, name.c_str(), varbuf, maxlen);
   else
     mg_get_http_var(&hm->query_string, name.c_str(), varbuf, maxlen);
+#endif /* MG_VERSION_NUMBER */
   res.assign(varbuf);
   delete[] varbuf;
   return res;
@@ -159,10 +165,19 @@ bool PageContext::getvar(const std::string& name, extram::string& dst) {
   int len;
   if (method == "POST") {
     dst.resize(hm->body.len, '\0');
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    len = mg_http_get_var(&hm->body, name.c_str(), &dst[0], hm->body.len);
+#else /* MG_VERSION_NUMBER */
     len = mg_get_http_var(&hm->body, name.c_str(), &dst[0], hm->body.len);
+#endif /* MG_VERSION_NUMBER */
   } else {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    dst.resize(hm->query.len, '\0');
+    len = mg_http_get_var(&hm->query, name.c_str(), &dst[0], hm->query.len);
+#else /* MG_VERSION_NUMBER */
     dst.resize(hm->query_string.len, '\0');
     len = mg_get_http_var(&hm->query_string, name.c_str(), &dst[0], hm->query_string.len);
+#endif /* MG_VERSION_NUMBER */
   }
   dst.resize((len >= 0) ? len : 0);
   return (len >= 0);
@@ -174,7 +189,11 @@ bool PageContext::getvar(const std::string& name, extram::string& dst) {
  */
 
 void PageContext::error(int code, const char* text) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_reply(nc, code, "", "");
+#else /* MG_VERSION_NUMBER */
   mg_http_send_error(nc, code, text);
+#endif /* MG_VERSION_NUMBER */
 }
 
 void PageContext::head(int code, const char* headers /*=NULL*/) {
@@ -183,19 +202,37 @@ void PageContext::head(int code, const char* headers /*=NULL*/) {
       "Content-Type: text/html; charset=utf-8\r\n"
       "Cache-Control: no-cache";
   }
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_printf(nc, "HTTP/1.1 %d OK\r\n%s\r\n", code, headers);
+  mg_printf(nc, "%s", "Transfer-Encoding: chunked\r\n");
+  mg_send(nc, "\r\n", 2);
+#else /* MG_VERSION_NUMBER */
   mg_send_head(nc, code, -1, headers);
+#endif /* MG_VERSION_NUMBER */
 }
 
 void PageContext::print(const std::string text) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_write_chunk(nc, text.data(), text.size());
+#else /* MG_VERSION_NUMBER */
   mg_send_http_chunk(nc, text.data(), text.size());
+#endif /* MG_VERSION_NUMBER */
 }
 
 void PageContext::print(const extram::string text) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_write_chunk(nc, text.data(), text.size());
+#else /* MG_VERSION_NUMBER */
   mg_send_http_chunk(nc, text.data(), text.size());
+#endif /* MG_VERSION_NUMBER */
 }
 
 void PageContext::print(const char* text) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_write_chunk(nc, text, strlen(text));
+#else /* MG_VERSION_NUMBER */
   mg_send_http_chunk(nc, text, strlen(text));
+#endif /* MG_VERSION_NUMBER */
 }
 
 void PageContext::printf(const char *fmt, ...) {
@@ -206,17 +243,29 @@ void PageContext::printf(const char *fmt, ...) {
   len = vasprintf(&buf, fmt, ap);
   va_end(ap);
   if (len >= 0)
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    mg_http_write_chunk(nc, buf, len);
+#else /* MG_VERSION_NUMBER */
     mg_send_http_chunk(nc, buf, len);
+#endif /* MG_VERSION_NUMBER */
   if (buf)
     free(buf);
 }
 
 void PageContext::done() {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_write_chunk(nc, "", 0);
+#else /* MG_VERSION_NUMBER */
   mg_send_http_chunk(nc, "", 0);
+#endif /* MG_VERSION_NUMBER */
 }
 
 void PageContext::panel_start(const char* type, const char* title) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"panel panel-%s\" id=\"panel-%s\">"
       "<div class=\"panel-heading\">%s</div>"
       "<div class=\"panel-body\">"
@@ -224,27 +273,43 @@ void PageContext::panel_start(const char* type, const char* title) {
 }
 
 void PageContext::panel_end(const char* footer) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc, (footer && footer[0])
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc, (footer && footer[0])
+#endif /* MG_VERSION_NUMBER */
     ? "</div><div class=\"panel-footer\">%s</div></div>"
     : "</div></div>"
     , footer);
 }
 
 void PageContext::form_start(std::string action, const char* target /*=NULL*/) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<form class=\"form-horizontal\" method=\"post\" action=\"%s\" target=\"%s\">"
     , _attr(action)
     , target ? _attr(target) : "#main");
 }
 
 void PageContext::form_end() {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc, "</form>");
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc, "</form>");
+#endif /* MG_VERSION_NUMBER */
 }
 
 void PageContext::input(const char* type, const char* label, const char* name, const char* value,
     const char* placeholder /*=NULL*/, const char* helptext /*=NULL*/, const char* moreattrs /*=NULL*/,
     const char* unit /*=NULL*/) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"form-group\">"
       "<label class=\"control-label col-sm-3\" for=\"input-%s\">%s%s</label>"
       "<div class=\"col-sm-9\">"
@@ -282,7 +347,11 @@ void PageContext::input_password(const char* label, const char* name, const char
 }
 
 void PageContext::input_select_start(const char* label, const char* name) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"form-group\">"
       "<label class=\"control-label col-sm-3\" for=\"input-%s\">%s:</label>"
       "<div class=\"col-sm-9\">"
@@ -291,20 +360,32 @@ void PageContext::input_select_start(const char* label, const char* name) {
 }
 
 void PageContext::input_select_option(const char* label, const char* value, bool selected) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<option value=\"%s\"%s>%s</option>"
     , _attr(value), selected ? " selected" : "", label);
 }
 
 void PageContext::input_select_end(const char* helptext /*=NULL*/) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc, "</select>%s%s%s</div></div>"
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc, "</select>%s%s%s</div></div>"
+#endif /* MG_VERSION_NUMBER */
     , helptext ? "<span class=\"help-block\">" : ""
     , helptext ? helptext : ""
     , helptext ? "</span>" : "");
 }
 
 void PageContext::input_radiobtn_start(const char* label, const char* name) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"form-group\">"
       "<label class=\"control-label col-sm-3\" for=\"input-%s\">%s:</label>"
       "<div class=\"col-sm-9\">"
@@ -313,7 +394,11 @@ void PageContext::input_radiobtn_start(const char* label, const char* name) {
 }
 
 void PageContext::input_radiobtn_option(const char* name, const char* label, const char* value, bool selected) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<label class=\"btn btn-default %s\">"
       "<input type=\"radio\" name=\"%s\" value=\"%s\" %s autocomplete=\"off\"> %s"
     "</label>"
@@ -324,14 +409,22 @@ void PageContext::input_radiobtn_option(const char* name, const char* label, con
 }
 
 void PageContext::input_radiobtn_end(const char* helptext /*=NULL*/) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc, "</div>%s%s%s</div></div>"
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc, "</div>%s%s%s</div></div>"
+#endif /* MG_VERSION_NUMBER */
     , helptext ? "<span class=\"help-block\">" : ""
     , helptext ? helptext : ""
     , helptext ? "</span>" : "");
 }
 
 void PageContext::input_radio_start(const char* label, const char* name) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"form-group\">"
       "<label class=\"control-label col-sm-3\" for=\"input-%s\">%s:</label>"
       "<div class=\"col-sm-9\">"
@@ -339,7 +432,11 @@ void PageContext::input_radio_start(const char* label, const char* name) {
 }
 
 void PageContext::input_radio_option(const char* name, const char* label, const char* value, bool selected) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"radio\"><label><input type=\"radio\" name=\"%s\"" " value=\"%s\" %s>%s</label></div>"
     , _attr(name), _attr(value)
     , selected ? "checked" : ""
@@ -347,7 +444,11 @@ void PageContext::input_radio_option(const char* name, const char* label, const 
 }
 
 void PageContext::input_radio_end(const char* helptext /*=NULL*/) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc, "%s%s%s</div></div>"
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc, "%s%s%s</div></div>"
+#endif /* MG_VERSION_NUMBER */
     , helptext ? "<span class=\"help-block\">" : ""
     , helptext ? helptext : ""
     , helptext ? "</span>" : "");
@@ -355,7 +456,11 @@ void PageContext::input_radio_end(const char* helptext /*=NULL*/) {
 
 void PageContext::input_checkbox(const char* label, const char* name, bool value,
     const char* helptext /*=NULL*/) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"form-group\">"
       "<div class=\"col-sm-9 col-sm-offset-3\">"
         "<div class=\"checkbox\">"
@@ -375,7 +480,11 @@ void PageContext::input_slider(const char* label, const char* name, int size, co
     int enabled, double value, double defval, double min, double max, double step /*=1*/,
     const char* helptext /*=NULL*/) {
   int width = 50 + size * 10;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"form-group\">"
       "<label class=\"control-label col-sm-3\" for=\"input-%s\">%s:</label>"
       "<div class=\"col-sm-9\">"
@@ -423,7 +532,11 @@ void PageContext::input_slider(const char* label, const char* name, int size, co
 
 void PageContext::input_button(const char* btnclass, const char* label,
     const char* name /*=NULL*/, const char* value /*=NULL*/) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"form-group\">"
       "<div class=\"col-sm-offset-3 col-sm-9\">"
         "<button type=\"submit\" class=\"btn btn-%s\" %s%s%s %s%s%s>%s</button>"
@@ -436,7 +549,11 @@ void PageContext::input_button(const char* btnclass, const char* label,
 }
 
 void PageContext::input_info(const char* label, const char* text) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"form-group\">"
       "<label class=\"control-label col-sm-3\">%s:</label>"
       "<div class=\"col-sm-9\">"
@@ -447,13 +564,21 @@ void PageContext::input_info(const char* label, const char* text) {
 }
 
 void PageContext::alert(const char* type, const char* text) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<div class=\"alert alert-%s\">%s</div>"
     , _attr(type), text);
 }
 
 void PageContext::fieldset_start(const char* title, const char* css_class /*=NULL*/) {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc,
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc,
+#endif /* MG_VERSION_NUMBER */
     "<fieldset class=\"%s\" id=\"fieldset-%s\"><legend>%s</legend>"
     , css_class ? css_class : ""
     , make_id(title).c_str()
@@ -461,11 +586,19 @@ void PageContext::fieldset_start(const char* title, const char* css_class /*=NUL
 }
 
 void PageContext::fieldset_end() {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc, "</fieldset>");
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc, "</fieldset>");
+#endif /* MG_VERSION_NUMBER */
 }
 
 void PageContext::hr() {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_printf_chunk(nc, "<hr>");
+#else /* MG_VERSION_NUMBER */
   mg_printf_http_chunk(nc, "<hr>");
+#endif /* MG_VERSION_NUMBER */
 }
 
 
@@ -584,7 +717,11 @@ void OvmsWebServer::OutputHome(PageEntry_t& p, PageContext_t& c)
 
   if (vehicle != "") {
     const char* vehiclename = MyVehicleFactory.ActiveVehicleName();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    mg_http_printf_chunk(c.nc,
+#else /* MG_VERSION_NUMBER */
     mg_printf_http_chunk(c.nc,
+#endif /* MG_VERSION_NUMBER */
       "<fieldset class=\"menu\" id=\"fieldset-menu-vehicle\"><legend>%s</legend>"
       "<ul class=\"list-inline\">%s</ul>"
       "</fieldset>"
@@ -697,7 +834,11 @@ void OvmsWebServer::HandleMenu(PageEntry_t& p, PageContext_t& c)
 {
   std::string menu = CreateMenu(c);
   c.head(200);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_http_write_chunk(c.nc, menu.data(), menu.length());
+#else /* MG_VERSION_NUMBER */
   mg_send_http_chunk(c.nc, menu.data(), menu.length());
+#endif /* MG_VERSION_NUMBER */
   c.done();
 }
 
@@ -831,17 +972,29 @@ void OvmsWebServer::HandleAsset(PageEntry_t& p, PageContext_t& c)
     gzip_encoded = false;
   }
   else {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    mg_http_reply(c.nc, 404, "", "");
+#else /* MG_VERSION_NUMBER */
     mg_http_send_error(c.nc, 404, "Not found");
+#endif /* MG_VERSION_NUMBER */
     return;
   }
 
   char etag[50], current_time[50], last_modified[50];
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  time_t t = (time_t) time(NULL);
+#else /* MG_VERSION_NUMBER */
   time_t t = (time_t) mg_time();
-  snprintf(etag, sizeof(etag), "\"%lx.%" INT64_FMT "\"", (unsigned long) mtime, (int64_t) size);
+#endif /* MG_VERSION_NUMBER */
+  snprintf(etag, sizeof(etag), "\"%lx.%" PRId64 "\"", (unsigned long) mtime, (int64_t) size);
   strftime(current_time, sizeof(current_time), "%a, %d %b %Y %H:%M:%S GMT", gmtime(&t));
   strftime(last_modified, sizeof(last_modified), "%a, %d %b %Y %H:%M:%S GMT", gmtime(&mtime));
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_printf(c.nc, "HTTP/1.1 200 OK\r\n");
+#else /* MG_VERSION_NUMBER */
   mg_send_response_line(c.nc, 200, NULL);
+#endif /* MG_VERSION_NUMBER */
   mg_printf(c.nc,
     "Date: %s\r\n"
     "Last-Modified: %s\r\n"
