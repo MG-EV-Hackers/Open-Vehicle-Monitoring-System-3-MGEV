@@ -240,7 +240,11 @@ void canlogconnection::OutputMsg(CAN_log_message_t& msg, std::string &result)
     {
     if (result.length()>0)
       {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      if (m_nc->send.len < 32768)
+#else /* MG_VERSION_NUMBER */
       if (m_nc->send_mbuf.len < 32768)
+#endif /* MG_VERSION_NUMBER */
         {
         mg_send(m_nc, (const char*)result.c_str(), result.length());
         }
@@ -263,7 +267,11 @@ void canlogconnection::TransmitCallback(uint8_t *buffer, size_t len)
 
   m_msgcount++;
 #ifdef CONFIG_OVMS_SC_GPL_MONGOOSE
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  if ((m_nc != NULL)&&(m_nc->send.len < 32768))
+#else /* MG_VERSION_NUMBER */
   if ((m_nc != NULL)&&(m_nc->send_mbuf.len < 32768))
+#endif /* MG_VERSION_NUMBER */
     {
     mg_send(m_nc, buffer, len);
     }

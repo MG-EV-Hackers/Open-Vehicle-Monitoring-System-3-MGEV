@@ -36,6 +36,7 @@
 #endif //#ifdef CONFIG_OVMS_SC_GPL_MONGOOSE
 #include "ovms_metrics.h"
 #include "id_filter.h"
+#include "mg_version.h"
 
 /**
  * canlog is the general interface and base implementation for all can loggers.

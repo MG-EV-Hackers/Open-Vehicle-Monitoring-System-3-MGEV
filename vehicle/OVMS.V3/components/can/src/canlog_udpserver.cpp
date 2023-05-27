@@ -63,7 +63,15 @@ void udpcanlogconnection::OutputMsg(CAN_log_message_t& msg, std::string &result)
 
   if (result.length()>0)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    struct mg_connection fake_nc;
+    fake_nc.is_udp = 1;
+    fake_nc.fd = m_fd;
+    memcpy(&fake_nc.rem, &m_rem, sizeof(fake_nc.rem));
+    mg_io_send(&fake_nc, (const void *)result.c_str(), result.length());
+#else /* MG_VERSION_NUMBER */
     sendto(m_sock, (const char*)result.c_str(), result.length(), 0, &m_sa, sizeof(m_sa));
+#endif /* MG_VERSION_NUMBER */
     }
   }
 
@@ -157,14 +165,22 @@ void OvmsCanLogUdpServerInit::NetManStop(std::string event, void* data)
   if (MyCanLogUdpServer) MyCanLogUdpServer->Close();
   }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+static void tsMongooseHandler(struct mg_connection *nc, int ev, void *p, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 static void tsMongooseHandler(struct mg_connection *nc, int ev, void *p)
+#endif /* MG_VERSION_NUMBER */
   {
   if (MyCanLogUdpServer)
     MyCanLogUdpServer->MongooseHandler(nc, ev, p);
   else if (ev == MG_EV_ACCEPT)
     {
     ESP_LOGI(TAG, "Log service connection rejected (logger not running)");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    nc->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
     nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
     }
   }
 
@@ -203,7 +219,11 @@ bool canlog_udpserver::Open()
     {
     if (MyNetManager.m_network_any)
       {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      m_mgconn = mg_listen(mgr, m_path.c_str(), tsMongooseHandler, NULL);
+#else /* MG_VERSION_NUMBER */
       m_mgconn = mg_bind(mgr, m_path.c_str(), tsMongooseHandler);
+#endif /* MG_VERSION_NUMBER */
       if (m_mgconn != NULL)
         {
         ESP_LOGI(TAG,"Listening with nc %p",m_mgconn);
@@ -238,13 +258,21 @@ void canlog_udpserver::Close()
       OvmsRecMutexLock lock(&m_cmmutex);
       for (conn_map_t::iterator it=m_connmap.begin(); it!=m_connmap.end(); ++it)
         {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        it->first->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
         it->first->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
         delete it->second;
         }
       m_connmap.clear();
       }
     ESP_LOGI(TAG, "Closed UDP server log: %s", GetStats().c_str());
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    m_mgconn->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
     m_mgconn->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
     m_mgconn = NULL;
     m_isopen = false;
     }
@@ -281,24 +309,47 @@ void canlog_udpserver::MongooseHandler(struct mg_connection *nc, int ev, void *p
 
   switch (ev)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_READ:
+#else /* MG_VERSION_NUMBER */
     case MG_EV_RECV:
+#endif /* MG_VERSION_NUMBER */
       {
       OvmsRecMutexLock lock(&m_cmmutex);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+      mg_snprintf(addr, sizeof(addr), "%M", mg_print_ip_port, &nc->rem);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      mg_snprintf(addr, sizeof(addr), "%I:%hu", nc->rem.is_ip6 ? 16 : 4, nc->rem.is_ip6 ? &nc->rem.ip6 : (void *) &nc->rem.ip, mg_ntohs(nc->loc.port));
+#else /* MG_VERSION_NUMBER */
       mg_sock_addr_to_str(&nc->sa, addr, sizeof(addr), MG_SOCK_STRINGIFY_IP|MG_SOCK_STRINGIFY_PORT);
+#endif /* MG_VERSION_NUMBER */
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      size_t used = nc->recv.len;
+#else /* MG_VERSION_NUMBER */
       size_t used = nc->recv_mbuf.len;
+#endif /* MG_VERSION_NUMBER */
 
       // Try to find an existing matching connection
       udpcanlogconnection* clc = NULL;
       for (conn_map_t::iterator it=m_connmap.begin(); it!=m_connmap.end(); ++it)
         {
         clc = (udpcanlogconnection*)it->second;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        if (memcmp(&clc->m_rem, &nc->rem, sizeof(nc->rem)) == 0)
+#else /* MG_VERSION_NUMBER */
         if (memcmp(&clc->m_sa, &nc->sa, sizeof(&nc->sa.sin)) == 0)
+#endif /* MG_VERSION_NUMBER */
           {
           // We have found an existing one, so just handle and tickle it
           ESP_LOGD(TAG,"Tickle connection from %s",addr);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+          used = clc->m_formatter->Serve((uint8_t*)nc->recv.buf, used, clc);
+          if (used>0) mg_iobuf_del(&nc->recv, 0, used); // Removes `used` bytes from the beginning of the buffer.
+#else /* MG_VERSION_NUMBER */
           used = clc->m_formatter->Serve((uint8_t*)nc->recv_mbuf.buf, used, clc);
           if (used>0) mbuf_remove(&nc->recv_mbuf, used);
+#endif /* MG_VERSION_NUMBER */
           clc->Tickle();
           return;
           }
@@ -308,8 +359,13 @@ void canlog_udpserver::MongooseHandler(struct mg_connection *nc, int ev, void *p
       ESP_LOGD(TAG,"New connection from %s",addr);
       clc = new udpcanlogconnection(this, m_format, m_mode);
       clc->m_nc = m_mgconn;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      clc->m_fd = nc->fd;
+      memcpy(&clc->m_rem, &nc->rem, sizeof(nc->rem));
+#else /* MG_VERSION_NUMBER */
       clc->m_sock = m_mgconn->sock;
       memcpy(&clc->m_sa,&nc->sa.sin,sizeof(nc->sa.sin));
+#endif /* MG_VERSION_NUMBER */
       clc->m_peer = std::string(addr);
       m_connmap[&clc->m_fakenc] = clc;
       std::string result = clc->m_formatter->getheader();
@@ -317,8 +373,13 @@ void canlog_udpserver::MongooseHandler(struct mg_connection *nc, int ev, void *p
         {
         mg_send(nc, (const char*)result.c_str(), result.length());
         }
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      used = clc->m_formatter->Serve((uint8_t*)nc->recv.buf, used, clc);
+      if (used > 0) mg_iobuf_del(&nc->recv, 0, used); // Removes `used` bytes from the beginning of the buffer.
+#else /* MG_VERSION_NUMBER */
       used = clc->m_formatter->Serve((uint8_t*)nc->recv_mbuf.buf, used, clc);
       if (used > 0) mbuf_remove(&nc->recv_mbuf, used);
+#endif /* MG_VERSION_NUMBER */
 
       break;
       }

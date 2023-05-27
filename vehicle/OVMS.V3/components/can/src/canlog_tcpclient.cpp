@@ -122,14 +122,22 @@ void OvmsCanLogTcpClientInit::NetManStop(std::string event, void* data)
   if (MyCanLogTcpClient) MyCanLogTcpClient->Close();
   }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+static void tcMongooseHandler(struct mg_connection *nc, int ev, void *p, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 static void tcMongooseHandler(struct mg_connection *nc, int ev, void *p)
+#endif /* MG_VERSION_NUMBER */
   {
   if (MyCanLogTcpClient)
     MyCanLogTcpClient->MongooseHandler(nc, ev, p);
   else if (ev == MG_EV_ACCEPT)
     {
     ESP_LOGI(TAG, "Log service connection rejected (logger not running)");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    nc->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
     nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
     }
   }
 
@@ -157,11 +165,15 @@ bool canlog_tcpclient::Open()
     if (MyNetManager.m_network_any)
       {
       ESP_LOGI(TAG, "Launching TCP client to %s",m_path.c_str());
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      if (mg_connect(mgr, m_path.c_str(), tcMongooseHandler, NULL) != NULL)
+#else /* MG_VERSION_NUMBER */
       struct mg_connect_opts opts;
       const char* err;
       memset(&opts, 0, sizeof(opts));
       opts.error_string = &err;
       if (mg_connect_opt(mgr, m_path.c_str(), tcMongooseHandler, opts) != NULL)
+#endif /* MG_VERSION_NUMBER */
         {
         // Wait 10s max for connection establishment...
         m_connecting.Take(pdMS_TO_TICKS(10*1000));
@@ -196,7 +208,11 @@ void canlog_tcpclient::Close()
       OvmsRecMutexLock lock(&m_cmmutex);
       for (conn_map_t::iterator it=m_connmap.begin(); it!=m_connmap.end(); ++it)
         {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        it->first->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
         it->first->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
         delete it->second;
         }
       m_connmap.clear();
@@ -259,21 +275,36 @@ void canlog_tcpclient::MongooseHandler(struct mg_connection *nc, int ev, void *p
           }
         }
       break;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_READ:
+      {
+      ESP_LOGV(TAG, "MongooseHandler(MG_EV_READ)");
+      size_t used = nc->recv.len;
+#else /* MG_VERSION_NUMBER */
     case MG_EV_RECV:
       {
       ESP_LOGV(TAG, "MongooseHandler(MG_EV_RECV)");
       size_t used = nc->recv_mbuf.len;
+#endif /* MG_VERSION_NUMBER */
       if (m_formatter != NULL)
         {
         OvmsRecMutexLock lock(&m_cmmutex);
         canlogconnection* clc = NULL;
         auto k = m_connmap.find(nc);
         if (k != m_connmap.end()) clc = k->second;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        used = m_formatter->Serve((uint8_t*)nc->recv.buf, used, clc);
+#else /* MG_VERSION_NUMBER */
         used = m_formatter->Serve((uint8_t*)nc->recv_mbuf.buf, used, clc);
+#endif /* MG_VERSION_NUMBER */
         }
       if (used > 0)
         {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_iobuf_del(&nc->recv, 0, used); // Removes `used` bytes from the beginning of the buffer.
+#else /* MG_VERSION_NUMBER */
         mbuf_remove(&nc->recv_mbuf, used);
+#endif /* MG_VERSION_NUMBER */
         }
       break;
       }

@@ -48,8 +48,13 @@ class udpcanlogconnection: public canlogconnection
     void Tickle();
 
   public:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    void * m_fd;               // Our main listening UDP socket
+    struct mg_addr m_rem;      // Our remote client address
+#else /* MG_VERSION_NUMBER */
     sock_t m_sock;             // Our main listening UDP socket
     struct sockaddr m_sa;      // Our remote client address
+#endif /* MG_VERSION_NUMBER */
     mg_connection m_fakenc;    // A fake nc, just as an index to us
     uint32_t m_timeout;        // Our timeout
   };

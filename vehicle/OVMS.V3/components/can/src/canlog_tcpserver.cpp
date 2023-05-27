@@ -123,14 +123,22 @@ void OvmsCanLogTcpServerInit::NetManStop(std::string event, void* data)
   if (MyCanLogTcpServer) MyCanLogTcpServer->Close();
   }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+static void tsMongooseHandler(struct mg_connection *nc, int ev, void *p, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 static void tsMongooseHandler(struct mg_connection *nc, int ev, void *p)
+#endif /* MG_VERSION_NUMBER */
   {
   if (MyCanLogTcpServer)
     MyCanLogTcpServer->MongooseHandler(nc, ev, p);
   else if (ev == MG_EV_ACCEPT)
     {
     ESP_LOGI(TAG, "Log service connection rejected (logger not running)");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    nc->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
     nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
     }
   }
 
@@ -163,7 +171,11 @@ bool canlog_tcpserver::Open()
     {
     if (MyNetManager.m_network_any)
       {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      m_mgconn = mg_listen(mgr, m_path.c_str(), tsMongooseHandler, NULL);
+#else /* MG_VERSION_NUMBER */
       m_mgconn = mg_bind(mgr, m_path.c_str(), tsMongooseHandler);
+#endif /* MG_VERSION_NUMBER */
       if (m_mgconn != NULL)
         {
         m_isopen = true;
@@ -197,13 +209,21 @@ void canlog_tcpserver::Close()
       OvmsRecMutexLock lock(&m_cmmutex);
       for (conn_map_t::iterator it=m_connmap.begin(); it!=m_connmap.end(); ++it)
         {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        it->first->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
         it->first->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
         delete it->second;
         }
       m_connmap.clear();
       }
     ESP_LOGI(TAG, "Closed TCP server log: %s", GetStats().c_str());
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    m_mgconn->is_closing = 1;
+#else /* MG_VERSION_NUMBER */
     m_mgconn->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
     m_mgconn = NULL;
     m_isopen = false;
     }
@@ -227,7 +247,13 @@ void canlog_tcpserver::MongooseHandler(struct mg_connection *nc, int ev, void *p
       {
       // New network connection has arrived
       OvmsRecMutexLock lock(&m_cmmutex);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+      mg_snprintf(addr, sizeof(addr), "%M", mg_print_ip, &nc->rem);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      mg_snprintf(addr, sizeof(addr), "%I", nc->rem.is_ip6 ? 16 : 4, nc->rem.is_ip6 ? &nc->rem.ip6 : (void *) &nc->rem.ip);
+#else /* MG_VERSION_NUMBER */
       mg_sock_addr_to_str(&nc->sa, addr, sizeof(addr), MG_SOCK_STRINGIFY_IP);
+#endif /* MG_VERSION_NUMBER */
       ESP_LOGI(TAG, "Log service connection from %s",addr);
       canlogconnection* clc = new canlogconnection(this, m_format, m_mode);
       clc->m_nc = nc;
@@ -248,7 +274,13 @@ void canlog_tcpserver::MongooseHandler(struct mg_connection *nc, int ev, void *p
       auto k = m_connmap.find(nc);
       if (k != m_connmap.end())
         {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+        mg_snprintf(addr, sizeof(addr), "%M", mg_print_ip, &nc->rem);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_snprintf(addr, sizeof(addr), "%I", nc->rem.is_ip6 ? 16 : 4, nc->rem.is_ip6 ? &nc->rem.ip6 : (void *) &nc->rem.ip);
+#else /* MG_VERSION_NUMBER */
         mg_sock_addr_to_str(&nc->sa, addr, sizeof(addr), MG_SOCK_STRINGIFY_IP);
+#endif /* MG_VERSION_NUMBER */
         ESP_LOGI(TAG, "Log service disconnection from %s",addr);
         delete k->second;
         m_connmap.erase(k);
@@ -256,21 +288,36 @@ void canlog_tcpserver::MongooseHandler(struct mg_connection *nc, int ev, void *p
       break;
       }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_READ:
+      {
+      // Receive data on the network connection
+      size_t used = nc->recv.len;
+#else /* MG_VERSION_NUMBER */
     case MG_EV_RECV:
       {
       // Receive data on the network connection
       size_t used = nc->recv_mbuf.len;
+#endif /* MG_VERSION_NUMBER */
       //ESP_LOGD(TAG,"Received %d bytes of data",used);
       if (m_formatter != NULL)
         {
         canlogconnection* clc = NULL;
         auto k = m_connmap.find(nc);
         if (k != m_connmap.end()) clc = k->second;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        used = clc->m_formatter->Serve((uint8_t*)nc->recv.buf, used, clc);
+#else /* MG_VERSION_NUMBER */
         used = clc->m_formatter->Serve((uint8_t*)nc->recv_mbuf.buf, used, clc);
+#endif /* MG_VERSION_NUMBER */
         }
       if (used > 0)
         {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_iobuf_del(&nc->recv, 0, used); // Removes `used` bytes from the beginning of the buffer.
+#else /* MG_VERSION_NUMBER */
         mbuf_remove(&nc->recv_mbuf, used);
+#endif /* MG_VERSION_NUMBER */
         }
       break;
       }
