@@ -45,6 +45,7 @@ static const char *TAG = "pushover";
 
 
 #include "mongoose.h"
+#include "mg_version.h"
 
 Pushover MyPushoverClient __attribute__ ((init_priority (8800)));
 
@@ -262,7 +263,11 @@ size_t Pushover::IncomingData(uint8_t* data, size_t len)
   }
 
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+static void PushoverMongooseCallback(struct mg_connection *nc, int ev, void *p, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 static void PushoverMongooseCallback(struct mg_connection *nc, int ev, void *p)
+#endif /* MG_VERSION_NUMBER */
   {
   switch (ev)
     {
@@ -291,17 +296,32 @@ static void PushoverMongooseCallback(struct mg_connection *nc, int ev, void *p)
         {
         MyNotify.NotifyString("info","pushover",MyPushoverClient.m_reply.c_str());
         }
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+      MyPushoverClient.m_mgconn->is_draining = 1;
+#else /* MG_VERSION_NUMBER */
       MyPushoverClient.m_mgconn->flags |= MG_F_SEND_AND_CLOSE;
+#endif /* MG_VERSION_NUMBER */
       MyPushoverClient.m_mgconn = 0;
       MyPushoverClient.m_buffer->EmptyAll();
       MyPushoverClient.m_mgconn_mutex.Unlock();
       break;
-    case MG_EV_SEND:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_WRITE:         // Data written to socket       long *bytes_written
+      ESP_LOGD(TAG, "PushoverMongooseCallback(MG_EV_WRITE) %" PRId32 " bytes",*(uint32_t*)p);
+#else /* MG_VERSION_NUMBER */
+    case MG_EV_SEND:          // last transmission has finished
       ESP_LOGD(TAG, "PushoverMongooseCallback(MG_EV_SEND) %" PRId32 " bytes",*(uint32_t*)p);
+#endif /* MG_VERSION_NUMBER */
       break;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_READ: // Data received from socket    long *bytes_read
+      ESP_LOGD(TAG, "PushoverMongooseCallback(MG_EV_READ) %" PRId32 " bytes",*(uint32_t*)p);
+      mg_iobuf_del(&nc->recv, 0, MyPushoverClient.IncomingData((uint8_t*)nc->recv.buf, nc->recv.len)); // Removes xxx bytes from the beginning of the buffer.
+#else /* MG_VERSION_NUMBER */
     case MG_EV_RECV:
       ESP_LOGD(TAG, "PushoverMongooseCallback(MG_EV_RECV) %" PRId32 " bytes",*(uint32_t*)p);
       mbuf_remove(&nc->recv_mbuf, MyPushoverClient.IncomingData((uint8_t*)nc->recv_mbuf.buf, nc->recv_mbuf.len));
+#endif /* MG_VERSION_NUMBER */
       break;
     case MG_EV_POLL:
       break;
@@ -362,6 +382,12 @@ bool Pushover::SendMessageOpt( const std::string user_key, const std::string tok
   m_reply = "";
   sendReplyNotification = replyNotification;
   struct mg_mgr* mgr = MyNetManager.GetMongooseMgr();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  struct mg_tls_opts opts;
+  memset(&opts, 0, sizeof(opts));
+  opts.ca = MyOvmsTLS.GetTrustedList();
+  if ((m_mgconn = mg_connect(mgr, _server.c_str(), PushoverMongooseCallback, NULL)) == NULL)
+#else /* MG_VERSION_NUMBER */
   struct mg_connect_opts opts;
   const char* err;
   memset(&opts, 0, sizeof(opts));
@@ -370,11 +396,20 @@ bool Pushover::SendMessageOpt( const std::string user_key, const std::string tok
   opts.ssl_ca_cert = MyOvmsTLS.GetTrustedList();
 
   if ((m_mgconn = mg_connect_opt(mgr, _server.c_str(), PushoverMongooseCallback, opts)) == NULL)
+#endif /* MG_VERSION_NUMBER */
     {
     m_mgconn_mutex.Unlock();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    ESP_LOGE(TAG, "mg_connect_opt(%s) failed", _server.c_str());
+#else /* MG_VERSION_NUMBER */
     ESP_LOGE(TAG, "mg_connect_opt(%s) failed: %s", _server.c_str(), err);
+#endif /* MG_VERSION_NUMBER */
     return false;
     }
+
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_tls_init(m_mgconn, &opts);
+#endif /* MG_VERSION_NUMBER */
 
   ESP_LOGV(TAG,"Msg: %s",http->str().c_str());
   mg_send(m_mgconn, http->str().c_str(), http->str().length());
