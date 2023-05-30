@@ -124,9 +124,9 @@ class OvmsServerV3 : public OvmsServer
     void Disconnect();
     void TransmitAllMetrics();
     void TransmitModifiedMetrics();
-    int TransmitNotificationInfo(OvmsNotifyEntry* entry);
-    int TransmitNotificationError(OvmsNotifyEntry* entry);
-    int TransmitNotificationAlert(OvmsNotifyEntry* entry);
+    void TransmitNotificationInfo(OvmsNotifyEntry* entry);
+    void TransmitNotificationError(OvmsNotifyEntry* entry);
+    void TransmitNotificationAlert(OvmsNotifyEntry* entry);
     int TransmitNotificationData(OvmsNotifyEntry* entry);
     void TransmitPendingNotificationsInfo();
     void TransmitPendingNotificationsError();

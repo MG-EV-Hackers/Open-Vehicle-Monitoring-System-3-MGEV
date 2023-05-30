@@ -41,6 +41,7 @@ static const char *TAG = "ovms-server-v3";
 #if CONFIG_MG_ENABLE_SSL
 #include "ovms_tls.h"
 #endif
+#include "mg_version.h"
 
 OvmsServerV3 *MyOvmsServerV3 = NULL;
 size_t MyOvmsServerV3Modifier = 0;
@@ -62,11 +63,152 @@ bool OvmsServerV3ReaderFilterCallback(OvmsNotifyType* type, const char* subtype)
     return false;
   }
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+static void OvmsServerV3MongooseCallback(struct mg_connection *nc, int ev, void *p, void *fn_data)
+#else /* MG_VERSION_NUMBER */
 static void OvmsServerV3MongooseCallback(struct mg_connection *nc, int ev, void *p)
+#endif /* MG_VERSION_NUMBER */
   {
   struct mg_mqtt_message *msg = (struct mg_mqtt_message *) p;
   switch (ev)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_ERROR:  // Error                        char *error_message
+      {
+      ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_ERROR)");
+      char *error_message = (char *)p;
+      // Connection failed
+      ESP_LOGW(TAG, "Connection failed: %s", error_message);
+      if (MyOvmsServerV3)
+        {
+        StandardMetrics.ms_s_v3_connected->SetValue(false);
+        StandardMetrics.ms_s_v3_peers->SetValue(0);
+        MyOvmsServerV3->SetStatus("Error: Connection failed", true, OvmsServerV3::WaitReconnect);
+        MyOvmsServerV3->m_connretry = 60;
+        }
+      }
+      break;
+    case MG_EV_CONNECT:  // Connection established       NULL
+      {
+      ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_CONNECT)");
+      // Successful connection
+      ESP_LOGI(TAG, "Connection successful");
+      // If target URL is SSL/TLS, command client connection to use TLS
+      if (MyOvmsServerV3->m_tls)
+        {
+#if CONFIG_MG_ENABLE_SSL
+        struct mg_tls_opts opts;
+        memset(&opts, 0, sizeof(opts));
+        opts.ca = MyOvmsTLS.GetTrustedList();
+        opts.srvname = mg_str(MyOvmsServerV3->m_server.c_str());
+        mg_tls_init(nc, &opts);
+#else
+        ESP_LOGE(TAG, "mg_connect(%s) failed: SSL support disabled", MyOvmsServerV3->m_server.c_str());
+        MyOvmsServerV3->SetStatus("Error: Connection failed (SSL support disabled)", true, OvmsServerV3::Undefined);
+#endif
+        }
+      }
+      break;
+    // case MG_EV_MQTT_OPEN:  // MQTT CONNACK received        int *connack_status_code
+    //   {
+    //   // MQTT connect is successful
+    //   struct mg_str subt = mg_str(s_sub_topic);
+    //   struct mg_str pubt = mg_str(s_pub_topic), data = mg_str("hello");
+    //   MG_INFO(("%lu CONNECTED to %s", c->id, s_url));
+    //   struct mg_mqtt_opts sub_opts;
+    //   memset(&sub_opts, 0, sizeof(sub_opts));
+    //   sub_opts.topic = subt;
+    //   sub_opts.qos = s_qos;
+    //   mg_mqtt_sub(c, &sub_opts);
+    //   MG_INFO(("%lu SUBSCRIBED to %.*s", c->id, (int) subt.len, subt.ptr));
+    //   struct mg_mqtt_opts pub_opts;
+    //   memset(&pub_opts, 0, sizeof(pub_opts));
+    //   pub_opts.topic = pubt;
+    //   pub_opts.message = data;
+    //   pub_opts.qos = s_qos, pub_opts.retain = false;
+    //   mg_mqtt_pub(c, &pub_opts);
+    //   MG_INFO(("%lu PUBLISHED %.*s -> %.*s", c->id, (int) data.len, data.ptr,
+    //            (int) pubt.len, pubt.ptr));
+    //   }
+    //   break;
+    case MG_EV_MQTT_MSG:  // MQTT PUBLISH received        struct mg_mqtt_message *
+      {
+      // When we get echo response, print it
+      struct mg_mqtt_message *mm = (struct mg_mqtt_message *) p;
+      MG_INFO(("%lu RECEIVED %.*s <- %.*s", nc->id, (int) mm->data.len,
+               mm->data.ptr, (int) mm->topic.len, mm->topic.ptr));
+      }
+      break;
+    case MG_EV_MQTT_CMD:  // MQTT low-level command       struct mg_mqtt_message *
+      {
+      switch (msg->cmd)
+        {
+        // case MQTT_CMD_CONNACK:
+        case MQTT_CMD_PUBACK:
+          {
+          ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_CMD/MQTT_CMD_PUBACK)");
+          ESP_LOGI(TAG, "Message publishing acknowledged (msg_id: %d)", msg->id);
+          break;
+          }
+        case MQTT_CMD_PUBREC:
+          {
+          ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_CMD/MQTT_CMD_PUBREC)");
+          if (MyOvmsServerV3)
+            {
+            MyOvmsServerV3->IncomingPubRec(msg->id);
+            }
+          break;
+          }
+        case MQTT_CMD_PUBREL:
+          {
+          ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_CMD/MQTT_CMD_PUBREL)");
+          uint16_t message_id = mg_htons(msg->id);
+          mg_mqtt_send_header(nc, MQTT_CMD_PUBCOMP, 0, sizeof(message_id));  // PUBCOMP - Assured publish complete
+          mg_send(nc, &message_id, sizeof(message_id));
+          break;
+          }
+        case MQTT_CMD_PUBCOMP:
+          {
+          ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_PUBCOMP)");
+          break;
+          }
+        // case MQTT_CMD_SUBSCRIBE:
+        case MQTT_CMD_SUBACK:
+          {
+          ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_CMD/MQTT_CMD_SUBACK)");
+          ESP_LOGI(TAG, "Subscription acknowledged");
+          break;
+          }
+        // case MQTT_CMD_UNSUBSCRIBE:
+        // case MQTT_CMD_UNSUBACK:
+        case MQTT_CMD_PUBLISH:
+          {
+          ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_CMD/MQTT_CMD_PUBLISH)");
+          ESP_LOGI(TAG, "Incoming message %.*s: %.*s", (int) msg->topic.len,
+                 msg->topic.ptr, (int) msg->data.len, msg->data.ptr);
+          if (MyOvmsServerV3)
+            {
+            MyOvmsServerV3->IncomingMsg(std::string(msg->topic.ptr,msg->topic.len),
+                                        std::string(msg->data.ptr,msg->data.len));
+            }
+          // Packet response is already handled by mongoose.
+          // Beware : https://github.com/cesanta/mongoose/issues/2220
+          // if (msg->qos == 1)
+          //   {
+          //   mg_mqtt_puback(nc, msg->message_id);
+          //   }
+          if (msg->qos == 2)
+            {
+            uint16_t message_id = mg_htons(msg->id);
+            mg_mqtt_send_header(nc, MQTT_CMD_PUBREC, 0 , sizeof(message_id));  // PUBREC - Publish received (QoS 2 publish received, part 1)
+            mg_send(nc, &message_id, sizeof(message_id));
+            }
+          break;
+          }
+        }
+      }
+      break;
+#else /* MG_VERSION_NUMBER */
     case MG_EV_CONNECT:
       {
       int *success = (int*)p;
@@ -99,11 +241,23 @@ static void OvmsServerV3MongooseCallback(struct mg_connection *nc, int ev, void 
         }
       }
       break;
+#endif /* MG_VERSION_NUMBER */
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    case MG_EV_MQTT_OPEN:  // MQTT CONNACK received        int *connack_status_code
+      {
+      ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_OPEN)");
+      int *connack_status_code = (int *) p;
+      if (*connack_status_code != 0)
+        {
+        ESP_LOGE(TAG, "Got mqtt connection error: %d\n", *connack_status_code);
+#else /* MG_VERSION_NUMBER */
     case MG_EV_MQTT_CONNACK:
+      {
       ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_CONNACK)");
       if (msg->connack_ret_code != MG_EV_MQTT_CONNACK_ACCEPTED)
         {
         ESP_LOGE(TAG, "Got mqtt connection error: %d\n", msg->connack_ret_code);
+#endif /* MG_VERSION_NUMBER */
         if (MyOvmsServerV3)
           {
           MyOvmsServerV3->Disconnect();
@@ -127,11 +281,16 @@ static void OvmsServerV3MongooseCallback(struct mg_connection *nc, int ev, void 
           }
         }
       break;
+      }
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
     case MG_EV_MQTT_SUBACK:
+      {
       ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_SUBACK)");
       ESP_LOGI(TAG, "Subscription acknowledged");
       break;
+      }
     case MG_EV_MQTT_PUBLISH:
+      {
       ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_PUBLISH)");
       ESP_LOGI(TAG, "Incoming message %.*s: %.*s", (int) msg->topic.len,
              msg->topic.p, (int) msg->payload.len, msg->payload.p);
@@ -149,25 +308,36 @@ static void OvmsServerV3MongooseCallback(struct mg_connection *nc, int ev, void 
         mg_mqtt_pubrec(nc, msg->message_id);
         }
       break;
+      }
     case MG_EV_MQTT_PUBACK:
+      {
       ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_PUBACK)");
       ESP_LOGI(TAG, "Message publishing acknowledged (msg_id: %d)", msg->message_id);
       break;
+      }
     case MG_EV_MQTT_PUBREL:
+      {
       ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_PUBREL)");
       mg_mqtt_pubcomp(nc, msg->message_id);
       break;
+      }
     case MG_EV_MQTT_PUBREC:
+      {
       ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_PUBCOMP)");
       if (MyOvmsServerV3)
         {
         MyOvmsServerV3->IncomingPubRec(msg->message_id);
         }
       break;
+      }
     case MG_EV_MQTT_PUBCOMP:
+      {
       ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_MQTT_PUBCOMP)");
       break;
+      }
+#endif /* MG_VERSION_NUMBER */
     case MG_EV_CLOSE:
+      {
       ESP_LOGV(TAG, "OvmsServerV3MongooseCallback(MG_EV_CLOSE)");
       if (MyOvmsServerV3)
         {
@@ -175,10 +345,14 @@ static void OvmsServerV3MongooseCallback(struct mg_connection *nc, int ev, void 
         MyOvmsServerV3->m_connretry = 60;
         }
       break;
+      }
     default:
+      {
       break;
+      }
     }
   }
+
 
 OvmsServerV3::OvmsServerV3(const char* name)
   : OvmsServer(name), m_metrics_filter(TAG)
@@ -315,12 +489,24 @@ void OvmsServerV3::TransmitMetric(OvmsMetric* metric)
 
   std::string val = metric->AsString();
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+  struct mg_mqtt_opts pub_opts;
+  memset(&pub_opts, 0, sizeof(pub_opts));
+  pub_opts.topic = mg_str(topic.c_str());
+  pub_opts.message = mg_str(val.c_str());
+  pub_opts.qos = 0;
+  pub_opts.retain = true;
+  mg_mqtt_pub(m_mgconn, &pub_opts);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_mqtt_pub(m_mgconn, mg_str(topic.c_str()), mg_str(val.c_str()), 0, true);
+#else /* MG_VERSION_NUMBER */
   mg_mqtt_publish(m_mgconn, topic.c_str(), m_msgid++,
     MG_MQTT_QOS(0) | MG_MQTT_RETAIN, val.c_str(), val.length());
+#endif /* MG_VERSION_NUMBER */
   ESP_LOGI(TAG,"Tx metric %s=%s",topic.c_str(),val.c_str());
   }
 
-int OvmsServerV3::TransmitNotificationInfo(OvmsNotifyEntry* entry)
+void OvmsServerV3::TransmitNotificationInfo(OvmsNotifyEntry* entry)
   {
   std::string topic(m_topic_prefix);
   topic.append("notify/info/");
@@ -328,14 +514,26 @@ int OvmsServerV3::TransmitNotificationInfo(OvmsNotifyEntry* entry)
 
   const extram::string result = mp_encode(entry->GetValue());
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+  struct mg_mqtt_opts pub_opts;
+  memset(&pub_opts, 0, sizeof(pub_opts));
+  pub_opts.topic = mg_str(topic.c_str());
+  pub_opts.message = mg_str(result.c_str());
+  pub_opts.qos = 1;
+  pub_opts.retain = false;
+  mg_mqtt_pub(m_mgconn, &pub_opts);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_mqtt_pub(m_mgconn, mg_str(topic.c_str()), mg_str(result.c_str()), 1, false);
+#else /* MG_VERSION_NUMBER */
   int id = m_msgid++;
   mg_mqtt_publish(m_mgconn, topic.c_str(), id,
     MG_MQTT_QOS(1), result.c_str(), result.length());
+#endif /* MG_VERSION_NUMBER */
   ESP_LOGI(TAG,"Tx notify %s=%s",topic.c_str(),result.c_str());
-  return id;
+  // return id;
   }
 
-int OvmsServerV3::TransmitNotificationError(OvmsNotifyEntry* entry)
+void OvmsServerV3::TransmitNotificationError(OvmsNotifyEntry* entry)
   {
   std::string topic(m_topic_prefix);
   topic.append("notify/error/");
@@ -343,14 +541,26 @@ int OvmsServerV3::TransmitNotificationError(OvmsNotifyEntry* entry)
 
   const extram::string result = mp_encode(entry->GetValue());
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+  struct mg_mqtt_opts pub_opts;
+  memset(&pub_opts, 0, sizeof(pub_opts));
+  pub_opts.topic = mg_str(topic.c_str());
+  pub_opts.message = mg_str(result.c_str());
+  pub_opts.qos = 1;
+  pub_opts.retain = false;
+  mg_mqtt_pub(m_mgconn, &pub_opts);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_mqtt_pub(m_mgconn, mg_str(topic.c_str()), mg_str(result.c_str()), 1, false);
+#else /* MG_VERSION_NUMBER */
   int id = m_msgid++;
   mg_mqtt_publish(m_mgconn, topic.c_str(), id,
     MG_MQTT_QOS(1), result.c_str(), result.length());
+#endif /* MG_VERSION_NUMBER */
   ESP_LOGI(TAG,"Tx notify %s=%s",topic.c_str(),result.c_str());
-  return id;
+  // return id;
   }
 
-int OvmsServerV3::TransmitNotificationAlert(OvmsNotifyEntry* entry)
+void OvmsServerV3::TransmitNotificationAlert(OvmsNotifyEntry* entry)
   {
   std::string topic(m_topic_prefix);
   topic.append("notify/alert/");
@@ -358,11 +568,23 @@ int OvmsServerV3::TransmitNotificationAlert(OvmsNotifyEntry* entry)
 
   const extram::string result = mp_encode(entry->GetValue());
 
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+  struct mg_mqtt_opts pub_opts;
+  memset(&pub_opts, 0, sizeof(pub_opts));
+  pub_opts.topic = mg_str(topic.c_str());
+  pub_opts.message = mg_str(result.c_str());
+  pub_opts.qos = 1;
+  pub_opts.retain = false;
+  mg_mqtt_pub(m_mgconn, &pub_opts);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_mqtt_pub(m_mgconn, mg_str(topic.c_str()), mg_str(result.c_str()), 1, false);
+#else /* MG_VERSION_NUMBER */
   int id = m_msgid++;
   mg_mqtt_publish(m_mgconn, topic.c_str(), id,
     MG_MQTT_QOS(1), result.c_str(), result.length());
+#endif /* MG_VERSION_NUMBER */
   ESP_LOGI(TAG,"Tx notify %s=%s",topic.c_str(),result.c_str());
-  return id;
+  // return id;
   }
 
 int OvmsServerV3::TransmitNotificationData(OvmsNotifyEntry* entry)
@@ -386,8 +608,20 @@ int OvmsServerV3::TransmitNotificationData(OvmsNotifyEntry* entry)
   const char* result = msg.c_str();
 
   int id = m_msgid++;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+  struct mg_mqtt_opts pub_opts;
+  memset(&pub_opts, 0, sizeof(pub_opts));
+  pub_opts.topic = mg_str(topic.c_str());
+  pub_opts.message = mg_str(result);
+  pub_opts.qos = 2;
+  pub_opts.retain = false;
+  mg_mqtt_pub(m_mgconn, &pub_opts);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_mqtt_pub(m_mgconn, mg_str(topic.c_str()), mg_str(result), 2, false);
+#else /* MG_VERSION_NUMBER */
   mg_mqtt_publish(m_mgconn, topic.c_str(), id,
     MG_MQTT_QOS(2), result, strlen(result));
+#endif /* MG_VERSION_NUMBER */
   ESP_LOGI(TAG,"Tx notify %s=%s",topic.c_str(),result);
   return id;
   }
@@ -516,7 +750,13 @@ void OvmsServerV3::IncomingMsg(std::string topic, std::string payload)
 
 void OvmsServerV3::IncomingPubRec(int id)
   {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  uint16_t message_id = mg_htons(id);
+  mg_mqtt_send_header(m_mgconn, MQTT_CMD_PUBREL, 2 /* PUBREL messages use QoS level 1 */, sizeof(message_id));  // PUBCOMP - Assured publish complete
+  mg_send(m_mgconn, &message_id, sizeof(message_id));
+#else /* MG_VERSION_NUMBER */
   mg_mqtt_pubrel(m_mgconn, id);
+#endif /* MG_VERSION_NUMBER */
   if ((id == m_notify_data_waitcomp)&&
       (m_notify_data_waittype != NULL)&&
       (m_notify_data_waitentry != NULL))
@@ -540,8 +780,20 @@ void OvmsServerV3::IncomingEvent(std::string event, void* data)
   topic.append("event");
 
   ESP_LOGI(TAG,"Tx event %s",event.c_str());
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+  struct mg_mqtt_opts pub_opts;
+  memset(&pub_opts, 0, sizeof(pub_opts));
+  pub_opts.topic = mg_str(topic.c_str());
+  pub_opts.message = mg_str(event.c_str());
+  pub_opts.qos = 0;
+  pub_opts.retain = false;
+  mg_mqtt_pub(m_mgconn, &pub_opts);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_mqtt_pub(m_mgconn, mg_str(topic.c_str()), mg_str(event.c_str()), 0, false);
+#else /* MG_VERSION_NUMBER */
   mg_mqtt_publish(m_mgconn, topic.c_str(), m_msgid++,
     MG_MQTT_QOS(0), event.c_str(), event.length());
+#endif /* MG_VERSION_NUMBER */
   }
 
 void OvmsServerV3::RunCommand(std::string client, std::string id, std::string command)
@@ -560,8 +812,20 @@ void OvmsServerV3::RunCommand(std::string client, std::string id, std::string co
   topic.append(client);
   topic.append("/response/");
   topic.append(id);
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+  struct mg_mqtt_opts pub_opts;
+  memset(&pub_opts, 0, sizeof(pub_opts));
+  pub_opts.topic = mg_str(topic.c_str());
+  pub_opts.message = mg_str(val.c_str());
+  pub_opts.qos = 1;
+  pub_opts.retain = false;
+  mg_mqtt_pub(m_mgconn, &pub_opts);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  mg_mqtt_pub(m_mgconn, mg_str(topic.c_str()), mg_str(val.c_str()), 1, false);
+#else /* MG_VERSION_NUMBER */
   mg_mqtt_publish(m_mgconn, topic.c_str(), m_msgid++,
     MG_MQTT_QOS(1), val.c_str(), val.length());
+#endif /* MG_VERSION_NUMBER */
   }
 
 void OvmsServerV3::AddClient(std::string id)
@@ -680,6 +944,47 @@ void OvmsServerV3::Connect()
   SetStatus("Connecting...", false, Connecting);
   OvmsMutexLock mg(&m_mgconn_mutex);
   struct mg_mgr* mgr = MyNetManager.GetMongooseMgr();
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  if (m_tls)
+    {
+#if CONFIG_MG_ENABLE_SSL
+    address.insert(0, "mqtts://");
+#else
+    ESP_LOGE(TAG, "mg_connect(%s) failed: SSL support disabled", address.c_str());
+    SetStatus("Error: Connection failed (SSL support disabled)", true, Undefined);
+    return;
+#endif
+    }
+    else
+    {
+    address.insert(0, "mqtt://");
+    }
+  ESP_LOGI(TAG, "before mg_connect() address: %s", address.c_str());
+
+  struct mg_mqtt_opts opts;
+  memset(&opts, 0, sizeof(opts));
+  opts.clean = true;
+  opts.version = 4;
+  opts.user = mg_str(m_user.c_str());
+  opts.pass = mg_str(m_password.c_str());
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+  opts.qos = 0;
+  opts.topic = mg_str(m_will_topic.c_str());
+  opts.message = mg_str("no");
+  opts.retain = true;
+#else /* MG_VERSION_NUMBER */
+  opts.will_qos = 0;
+  opts.will_topic = mg_str(m_will_topic.c_str());
+  opts.will_message = mg_str("no");
+  opts.will_retain = true;
+#endif /* MG_VERSION_NUMBER */
+  if ((m_mgconn = mg_mqtt_connect(mgr, address.c_str(), &opts, OvmsServerV3MongooseCallback, NULL)) == NULL)
+    {
+    ESP_LOGE(TAG, "mg_connect(%s) failed", address.c_str());
+    m_connretry = 20; // Try again in 60 seconds...
+    return;
+    }
+#else /* MG_VERSION_NUMBER */
   struct mg_connect_opts opts;
   const char* err;
   memset(&opts, 0, sizeof(opts));
@@ -701,6 +1006,7 @@ void OvmsServerV3::Connect()
     m_connretry = 20; // Try again in 20 seconds...
     return;
     }
+#endif /* MG_VERSION_NUMBER */
   return;
   }
 
@@ -709,7 +1015,11 @@ void OvmsServerV3::Disconnect()
   OvmsMutexLock mg(&m_mgconn_mutex);
   if (m_mgconn)
     {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    m_mgconn->is_closing = 1;         // Tell mongoose to close this connection
+#else /* MG_VERSION_NUMBER */
     m_mgconn->flags |= MG_F_CLOSE_IMMEDIATELY;
+#endif /* MG_VERSION_NUMBER */
     m_mgconn = NULL;
     SetStatus("Disconnected from OVMS Server V3", false, Disconnected);
     }
@@ -907,13 +1217,29 @@ void OvmsServerV3::Ticker1(std::string event, void* data)
     if (m_sendall)
       {
       ESP_LOGI(TAG, "Subscribe to MQTT topics");
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+      struct mg_mqtt_opts sub_opts;
+#endif /* MG_VERSION_NUMBER */
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
       struct mg_mqtt_topic_expression topics[MQTT_CONN_NTOPICS];
+#endif /* MG_VERSION_NUMBER */
       for (int k=0;k<MQTT_CONN_NTOPICS;k++)
         {
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 10, 0)
+        memset(&sub_opts, 0, sizeof(sub_opts));
+        sub_opts.topic = mg_str(m_conn_topic[k].c_str());
+        sub_opts.qos = 1;
+        mg_mqtt_sub(m_mgconn, &sub_opts);
+#elif MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+        mg_mqtt_sub(m_mgconn, mg_str(m_conn_topic[k].c_str()), 1);
+#else /* MG_VERSION_NUMBER */
         topics[k].topic = m_conn_topic[k].c_str();
         topics[k].qos = 1;
+#endif /* MG_VERSION_NUMBER */
         }
+#if MG_VERSION_NUMBER < MG_VERSION_VAL(7, 0, 0)
       mg_mqtt_subscribe(m_mgconn, topics, MQTT_CONN_NTOPICS, m_msgid++);
+#endif /* MG_VERSION_NUMBER */
 
       ESP_LOGI(TAG, "Transmit all metrics");
       TransmitAllMetrics();
