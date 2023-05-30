@@ -33,6 +33,7 @@
 
 #include "ovms_mutex.h"
 #include "ovms_netmanager.h"
+#include "mg_version.h"
 
 class OvmsMongooseWrapper
   {
@@ -57,7 +58,11 @@ class OvmsNetTcpClient: public OvmsMongooseWrapper
     virtual void Mongoose(struct mg_connection *nc, int ev, void *ev_data);
 
   public:
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    bool Connect(std::string dest, struct mg_tls_opts opts, double timeout = 0.0);
+#else /* MG_VERSION_NUMBER */
     bool Connect(std::string dest, struct mg_connect_opts opts, double timeout = 0.0);
+#endif /* MG_VERSION_NUMBER */
     void Disconnect();
     size_t SendData(uint8_t *data, size_t length);
     bool IsConnected();
@@ -82,6 +87,9 @@ class OvmsNetTcpClient: public OvmsMongooseWrapper
     std::string m_dest;
     struct mg_connection *m_mgconn;
     NetState m_netstate;
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+    double m_timeout = 0.0;
+#endif /* MG_VERSION_NUMBER */
   };
 
 #endif //#ifndef __OVMS_NETCONNS_H__

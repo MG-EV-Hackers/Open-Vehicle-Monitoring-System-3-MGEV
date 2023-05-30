@@ -38,6 +38,7 @@ static const char *TAG = "ovms-net-http";
 #endif
 #include "ovms_utils.h"
 #include "ovms_buffer.h"
+#include "mg_version.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // OvmsNetHttpAsyncClient
@@ -107,6 +108,20 @@ bool OvmsNetHttpAsyncClient::Request(std::string url, const char* method, double
     }
 
   ESP_LOGD(TAG, "OvmsNetHttpAsyncClient Connect to %s for request %s %s", m_dest.c_str(), method, url.c_str());
+#if MG_VERSION_NUMBER >= MG_VERSION_VAL(7, 0, 0)
+  struct mg_tls_opts opts;
+  memset(&opts, 0, sizeof(opts));
+  if (m_tls)
+    {
+    #ifdef CONFIG_MG_ENABLE_SSL
+      opts.ca = MyOvmsTLS.GetTrustedList();
+      opts.srvname = mg_str(m_server.c_str());
+    #else
+      ESP_LOGE(TAG, "OvmsNetHttpAsyncClient: SSL support disabled");
+      return false;
+    #endif
+    }
+#else /* MG_VERSION_NUMBER */
   struct mg_connect_opts opts;
   memset(&opts, 0, sizeof(opts));
   if (m_tls)
@@ -119,6 +134,7 @@ bool OvmsNetHttpAsyncClient::Request(std::string url, const char* method, double
       return false;
     #endif
     }
+#endif /* MG_VERSION_NUMBER */
 
   m_httpstate = NetHttpConnecting;
   return Connect(m_dest, opts, timeout);
