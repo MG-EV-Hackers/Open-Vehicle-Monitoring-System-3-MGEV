@@ -219,6 +219,7 @@ void OvmsVehicleMgEv::IncomingPollReply(const OvmsPoller::poll_job_t &job, uint8
             IncomingPepsPoll(job.pid, data, length);
             break;
         case (evccId | rxFlag):
+        case (ccuId | rxFlag):
             IncomingEvccPoll(job.pid, data, length);
             break;
         case (bcmId | rxFlag):

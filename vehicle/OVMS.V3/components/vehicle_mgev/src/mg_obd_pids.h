@@ -45,6 +45,7 @@ constexpr uint32_t tpmsId = 0x724u;
 constexpr uint32_t pepsId = 0x745u;
 constexpr uint32_t ipkId = 0x760u;
 constexpr uint32_t evccId = 0x784u;
+constexpr uint32_t ccuId = 0x7e4u;
 constexpr uint32_t rxFlag = 0x8u;
 
 // Generic PIDs
@@ -149,5 +150,13 @@ constexpr uint16_t pepsLockPid = 0xb013u;
 constexpr uint16_t evccVoltagePid = 0xb010u;
 constexpr uint16_t evccAmperagePid = 0xb001u;
 constexpr uint16_t evccMaxAmperagePid = 0xb003u;
+constexpr uint16_t evccChargingPid = 0xb00fu;
+constexpr uint16_t evccStatusPid = 0xb013u;
+
+// GWM PIDs
+constexpr uint16_t vehTimePid = 0x010bu;
+constexpr uint16_t odoPid = 0xb921u;
+constexpr uint16_t vehStatusPid = 0xd001u;
+constexpr uint16_t vinPid = 0xf190u;
 
 #endif  // MG_OBD_PIDS_H_

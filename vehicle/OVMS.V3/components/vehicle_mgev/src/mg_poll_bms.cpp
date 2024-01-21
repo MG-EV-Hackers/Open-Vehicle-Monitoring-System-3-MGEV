@@ -234,6 +234,7 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
             break;
         case bmsRangePid:
             //StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
+            ESP_LOGD(TAG, "BMS Range: %0.2f",value / 10.0f);
             break;
         case bmsMaxCellVoltagePid:
             m_bms_max_cell_voltage->SetValue(value / 1000.0f);
@@ -268,6 +269,7 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
 
 void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
 {
+    ESP_LOGD(TAG, "BMS Status: %02X",status);
     switch (status) {
         case StartingCharge:
         case Charging:
@@ -304,8 +306,8 @@ void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
 
 float OvmsVehicleMgEv::calculateSoc(uint16_t value)
 {
-    float lowerlimit = m_dod_lower->AsFloat();
-    float upperlimit = m_dod_upper->AsFloat();
+    float lowerlimit = MyConfig.GetParamValueInt("xmg","bms.dod.lower");
+    float upperlimit = MyConfig.GetParamValueInt("xmg","bms.dod.upper");
     ESP_LOGD(TAG, "BMS Limits: Lower = %f Upper = %f",lowerlimit,upperlimit);
     // Calculate SOC from upper and lower limits
     return (value - lowerlimit) * 100.0f / (upperlimit - lowerlimit);

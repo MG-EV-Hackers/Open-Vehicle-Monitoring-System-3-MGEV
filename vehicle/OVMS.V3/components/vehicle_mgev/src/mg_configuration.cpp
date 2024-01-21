@@ -86,6 +86,51 @@ void OvmsVehicleMgEv::ConfigChanged(OvmsConfigParam* param)
         ESP_LOGD(TAG, "BMS DoD lower = %f upper = %f", MyConfig.GetParamValueFloat("xmg","bms.dod.lower"), MyConfig.GetParamValueFloat("xmg","bms.dod.upper"));
     }
     
+    if(StandardMetrics.ms_v_type->AsString() == "MG4") {
+        int vehicleVersion = MyConfig.GetParamValueInt("xmg", "vehval", 0);
+        //ESP_LOGI(TAG, "Vehicle Version %c", MyConfig.GetParamValue("xmg", "vehtype","unknown"));
+        switch (vehicleVersion) {
+            case 0:
+                ESP_LOGD(TAG,"MG4 51kWh");
+                StandardMetrics.ms_v_bat_range_full->SetValue(400.0);
+                m_batt_capacity->SetValue(50.8);
+                m_max_dc_charge_rate->SetValue(90);
+                MyConfig.SetParamValueFloat("xmg","bms.dod.lower", 25.0);
+                MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
+                break;
+            case 1:
+                ESP_LOGD(TAG,"MG4 64kWh");
+                StandardMetrics.ms_v_bat_range_full->SetValue(450.0);
+                m_batt_capacity->SetValue(61.7); //NCM 104cells 400V
+                m_max_dc_charge_rate->SetValue(140.0);
+                MyConfig.SetParamValueFloat("xmg","bms.dod.lower", 25.0);
+                MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
+                break;
+           case 2:
+                ESP_LOGD(TAG,"MG4 77kWh");
+                StandardMetrics.ms_v_bat_range_full->SetValue(625.0);
+                m_batt_capacity->SetValue(74.4); //NCM 104cells 400V
+                m_max_dc_charge_rate->SetValue(144.0);
+                MyConfig.SetParamValueFloat("xmg","bms.dod.lower", 25.0);
+                MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
+                break;
+            default:
+                ESP_LOGD(TAG,"MG4 51kWh");
+                StandardMetrics.ms_v_bat_range_full->SetValue(400.0);
+                m_batt_capacity->SetValue(50.8);
+                m_max_dc_charge_rate->SetValue(90);
+                MyConfig.SetParamValueFloat("xmg","bms.dod.lower", 25.0);
+                MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
+                break;
+        }
+
+        ESP_LOGD(TAG, "MG4 Values - Range: %0.1f Battery kWh: %0.1f Charge Max: %0.1f DoD lower: %0.1f DoD Upper: %0.1f", StandardMetrics.ms_v_bat_range_full->AsFloat(),
+                 m_batt_capacity->AsFloat(),
+                 m_max_dc_charge_rate->AsFloat(),
+                 MyConfig.GetParamValueFloat("xmg","bms.dod.lower"),
+                 MyConfig.GetParamValueFloat("xmg","bms.dod.upper"));
+    }
+
     if(StandardMetrics.ms_v_type->AsString() == "MG5") {
         int VehicleVersion = MyConfig.GetParamValueInt("xmg", "vehval", 0);
         //ESP_LOGI(TAG, "Vehicle Version %c", MyConfig.GetParamValue("xmg", "vehtype","unknown"));

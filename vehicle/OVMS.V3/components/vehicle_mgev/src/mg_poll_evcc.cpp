@@ -35,8 +35,8 @@ void OvmsVehicleMgEv::IncomingEvccPoll(uint16_t pid, uint8_t* data, uint8_t leng
 {
     uint16_t value = (data[0] << 8 | data[1]);
 
-    float subtract = 2047.0f;
-    float divisorA = 5.7f;
+    float subtract = 2048.0f;
+    float divisorA = 5.0f;
     float divisorMaxA = 2.3f;
     float divisorV = 93.0f;
 
@@ -59,6 +59,9 @@ void OvmsVehicleMgEv::IncomingEvccPoll(uint16_t pid, uint8_t* data, uint8_t leng
             StandardMetrics.ms_v_charge_voltage->SetValue(value / divisorV);
             StandardMetrics.ms_v_charge_power->SetValue(
                 (value / divisorV)  * StandardMetrics.ms_v_charge_current->AsFloat() / 1000.0f);
+            break;
+        case evccChargingPid:
+            StandardMetrics.ms_v_charge_inprogress->SetValue(data[0]);
             break;
     }
 }
