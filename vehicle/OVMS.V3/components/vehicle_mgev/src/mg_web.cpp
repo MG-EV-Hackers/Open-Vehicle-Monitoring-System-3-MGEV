@@ -69,12 +69,17 @@ void OvmsVehicleMgEv::WebInit()
     MyWebServer.RegisterPage("/bms/metrics_charger", "Charging Metrics", WebDispChgMetrics, PageMenu_Vehicle, PageAuth_Cookie);
 }
 
+void OvmsVehicleMgEv::Mg4WebInit()
+{
+    // vehicle menu:
+    MyWebServer.RegisterPage("/xmg/version", "Version", MG4WebCfgVersion, PageMenu_Vehicle, PageAuth_Cookie);
+}
+
 void OvmsVehicleMgEv::Mg5WebInit()
 {
     // vehicle menu:
     MyWebServer.RegisterPage("/xmg/features", "Features", MG5WebCfgFeatures, PageMenu_Vehicle, PageAuth_Cookie);
     MyWebServer.RegisterPage("/xmg/version", "Version", MG5WebCfgVersion, PageMenu_Vehicle, PageAuth_Cookie);
-    MyWebServer.RegisterPage("/xmg/version", "Version", MG4WebCfgVersion, PageMenu_Vehicle, PageAuth_Cookie);
 }
 
 void OvmsVehicleMgEv::FeaturesWebInit()
@@ -529,7 +534,7 @@ void OvmsVehicleMgEv::WebDispChgMetrics(PageEntry_t &p, PageContext_t &c)
     "}\n"
     "</style>\n"
     "<div class=\"panel panel-primary\">"
-      "<div class=\"panel-heading\">MG ZS EV Charging Metrics</div>"
+      "<div class=\"panel-heading\">MG EV Charging Metrics</div>"
       "<div class=\"panel-body\">"
         "<div class=\"receiver\">"
 

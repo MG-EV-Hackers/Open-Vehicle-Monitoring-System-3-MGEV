@@ -353,6 +353,7 @@ class OvmsVehicleMgEv : public OvmsVehicle
     void WebInit();
     void WebDeInit();
     void Mg5WebInit();
+    void Mg4WebInit();
     void FeaturesWebInit();
     void FeaturesWebDeInit();
     void VersionWebDeInit();
