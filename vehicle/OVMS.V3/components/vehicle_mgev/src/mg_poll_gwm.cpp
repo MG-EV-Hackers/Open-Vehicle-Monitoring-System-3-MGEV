@@ -70,8 +70,9 @@ void OvmsVehicleMgEv::IncomingGwmPoll(uint16_t pid, uint8_t* data, uint8_t lengt
                     case Acc:
                         ESP_LOGI(TAG,"Vehicle Status = ACC");
                         if(m_gwm_state->AsInt() == Ready) {
-                            ESP_LOGI(TAG,"Vehicle Status changed from Ready to Acc. Set Polls to Listen Only");
+                            ESP_LOGI(TAG,"Vehicle Status changed from Ready to Acc. Turning polling off");
                             PollSetState(PollStateListenOnly);
+                            m_enable_polling->SetValue(false);
                         }
                         break;
                     case Ready:
