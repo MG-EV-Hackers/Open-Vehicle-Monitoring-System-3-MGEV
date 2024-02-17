@@ -91,7 +91,7 @@ void OvmsVehicleMgEv::ConfigChanged(OvmsConfigParam* param)
         //ESP_LOGI(TAG, "Vehicle Version %c", MyConfig.GetParamValue("xmg", "vehtype","unknown"));
         switch (vehicleVersion) {
             case 0:
-                ESP_LOGD(TAG,"MG4 51kWh");
+                ESP_LOGI(TAG,"MG4 51kWh");
                 StandardMetrics.ms_v_bat_range_full->SetValue(400.0);
                 m_batt_capacity->SetValue(50.8);
                 m_max_dc_charge_rate->SetValue(90);
@@ -99,7 +99,7 @@ void OvmsVehicleMgEv::ConfigChanged(OvmsConfigParam* param)
                 MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
                 break;
             case 1:
-                ESP_LOGD(TAG,"MG4 64kWh");
+                ESP_LOGI(TAG,"MG4 64kWh");
                 StandardMetrics.ms_v_bat_range_full->SetValue(450.0);
                 m_batt_capacity->SetValue(61.7); //NCM 104cells 400V
                 m_max_dc_charge_rate->SetValue(140.0);
@@ -107,7 +107,7 @@ void OvmsVehicleMgEv::ConfigChanged(OvmsConfigParam* param)
                 MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
                 break;
            case 2:
-                ESP_LOGD(TAG,"MG4 77kWh");
+                ESP_LOGI(TAG,"MG4 77kWh");
                 StandardMetrics.ms_v_bat_range_full->SetValue(625.0);
                 m_batt_capacity->SetValue(74.4); //NCM 104cells 400V
                 m_max_dc_charge_rate->SetValue(144.0);
@@ -115,7 +115,7 @@ void OvmsVehicleMgEv::ConfigChanged(OvmsConfigParam* param)
                 MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
                 break;
             default:
-                ESP_LOGD(TAG,"MG4 51kWh");
+                ESP_LOGI(TAG,"MG4 51kWh");
                 StandardMetrics.ms_v_bat_range_full->SetValue(400.0);
                 m_batt_capacity->SetValue(50.8);
                 m_max_dc_charge_rate->SetValue(90);
@@ -135,14 +135,14 @@ void OvmsVehicleMgEv::ConfigChanged(OvmsConfigParam* param)
         int VehicleVersion = MyConfig.GetParamValueInt("xmg", "vehval", 0);
         //ESP_LOGI(TAG, "Vehicle Version %c", MyConfig.GetParamValue("xmg", "vehtype","unknown"));
         if(VehicleVersion == 0) {
-            ESP_LOGV(TAG,"MG5 Version - SR");
+            ESP_LOGI(TAG,"MG5 Version - SR");
             StandardMetrics.ms_v_bat_range_full->SetValue(290.0);
             m_batt_capacity->SetValue(48.8);
             m_max_dc_charge_rate->SetValue(80);
             m_dod_lower->SetValue(36.0);
             m_dod_upper->SetValue(994.0);
         } else {
-            ESP_LOGV(TAG,"MG5 Version - LR");
+            ESP_LOGI(TAG,"MG5 Version - LR");
             StandardMetrics.ms_v_bat_range_full->SetValue(320.0);
             m_batt_capacity->SetValue(57.4);
             m_max_dc_charge_rate->SetValue(87);
