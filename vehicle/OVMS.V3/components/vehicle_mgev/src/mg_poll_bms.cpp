@@ -79,9 +79,55 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
         uint16_t pid, uint8_t* data, uint8_t length, uint16_t remain)
 {
     uint16_t value = (data[0] << 8 | data[1]);
+    //float currentSoc;
 
     switch (pid)
     {
+        case engineSpeedPid:
+        {
+            int engineRPM = value / 4;
+            if (engineRPM > 0) {
+                ESP_LOGI(TAG, "Engine Speed = %dRPM", engineRPM);
+            }
+            break;
+        }
+        case vehicleSpeedPid:
+        {
+            int vehSpeed = data[0];
+            if (vehSpeed > 0) {
+                ESP_LOGI(TAG, "Vehicle Speed = %dkph", vehSpeed);
+            }
+            break;
+        }
+        case odometerPid:
+            ESP_LOGI(TAG, "Odometer = %0.0fKm", (data[0] << 24 |data[1] << 16 | data[2] << 8 | data[3]) / 10.0);
+            break;
+        case socPid:
+        {
+            //ESP_LOGI(TAG, "BMS Poll Received PID: %02x %02x", pid, data[0]);
+            float currentSoc = data[0] * 100.0 / 255.0;
+            if(currentSoc != StandardMetrics.ms_v_bat_soc->AsFloat()) {
+                ESP_LOGI(TAG, "Current SOC = %0.2f%%", currentSoc);
+            }
+            // Save SOC for display
+            StandardMetrics.ms_v_bat_soc->SetValue(currentSoc);
+            calculateRange(currentSoc);
+            if (currentSoc < 99.5)
+            {
+                StandardMetrics.ms_v_charge_state->SetValue("charging");
+            }
+            else
+            {
+                StandardMetrics.ms_v_charge_state->SetValue("topoff");
+            }
+            break;
+        }
+        case ambTempPid:
+        {
+            int ambTemp = data[0] - 40;
+                ESP_LOGI(TAG, "Outside Temperature = %dDeg", ambTemp);
+            break;
+        }
         case cell1StatPid:
             ProcessBatteryStats(0, data, remain);
             break;
@@ -200,6 +246,8 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 // Save SOC for display
                 StandardMetrics.ms_v_bat_soc->SetValue(scaledSoc);
                 // Calculate Estimated Range
+                calculateRange(scaledSoc);
+                /*
                 float batTemp = StandardMetrics.ms_v_bat_temp->AsFloat();
                 float effSoh = StandardMetrics.ms_v_bat_soh->AsFloat();
                 // Get average trip consumption weighted by current trip consumption (25%)
@@ -213,6 +261,7 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
                 StandardMetrics.ms_v_bat_range_est->SetValue(batteryCapacity * (kmPerKwh * (1-((20 - batTemp) * 1.3f) * 0.01f)));
                 // Ideal range set to SoC percentage of WLTP Range
                 StandardMetrics.ms_v_bat_range_ideal->SetValue(StdMetrics.ms_v_bat_range_full->AsFloat(0, Kilometers) * (scaledSoc * 0.01f) * (effSoh * 0.01f));
+                 */
             }
             break;
         case batteryErrorPid:
@@ -234,7 +283,7 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
             break;
         case bmsRangePid:
             //StandardMetrics.ms_v_bat_range_est->SetValue(value / 10.0);
-            ESP_LOGD(TAG, "BMS Range: %0.2f",value / 10.0f);
+            ESP_LOGD(TAG, "BMS Range: %0.2f",value / 255.0f);
             break;
         case bmsMaxCellVoltagePid:
             m_bms_max_cell_voltage->SetValue(value / 1000.0f);
@@ -263,13 +312,15 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
             break;
         case bmsSystemMainRelayPPid:     
             m_bms_main_relay_p->SetValue(data[0]);                          
-            break;            
+            break;
+        default:
+            break;
     }
 }
 
 void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
 {
-    ESP_LOGD(TAG, "BMS Status: %02X",status);
+    ESP_LOGI(TAG, "BMS Status: %02X",status);
     switch (status) {
         case StartingCharge:
         case Charging:
@@ -312,3 +363,23 @@ float OvmsVehicleMgEv::calculateSoc(uint16_t value)
     // Calculate SOC from upper and lower limits
     return (value - lowerlimit) * 100.0f / (upperlimit - lowerlimit);
 }
+
+void OvmsVehicleMgEv::calculateRange(float soc) {
+    // Calculate Estimated Range
+    float batTemp = StandardMetrics.ms_v_bat_temp->AsFloat();
+    float effSoh = StandardMetrics.ms_v_bat_soh->AsFloat();
+    // Get average trip consumption weighted by current trip consumption (25%)
+    float kmPerKwh = (m_avg_consumption->AsFloat(0, KPkWh) * 3.0f + m_trip_consumption->AsFloat(0,KPkWh)) / 4.0f;
+    
+    if(kmPerKwh < 4.648)  kmPerKwh = 4.648; //21.5 kWh/100km
+    if(kmPerKwh > 7.728) kmPerKwh = 7.728; //13 kWh/100km
+    if(batTemp > 20) batTemp = 20;
+    // Set battery capacity reduced by SOC and SOH
+    float batteryCapacity = m_batt_capacity->AsFloat() * (soc * 0.01f) * (effSoh * 0.01f);
+    ESP_LOGD(TAG, "Estimated range = %0.2f",batteryCapacity * (kmPerKwh * (1-((20 - batTemp) * 1.3f) * 0.01f)));
+    StandardMetrics.ms_v_bat_range_est->SetValue(batteryCapacity * (kmPerKwh * (1-((20 - batTemp) * 1.3f) * 0.01f)));
+    // Ideal range set to SoC percentage of WLTP Range
+    ESP_LOGD(TAG, "Ideal Range = %0.2f",(StdMetrics.ms_v_bat_range_full->AsFloat(0, Kilometers) * (soc * 0.01f) * (effSoh * 0.01f)));
+    StandardMetrics.ms_v_bat_range_ideal->SetValue(StdMetrics.ms_v_bat_range_full->AsFloat(0, Kilometers) * (soc * 0.01f) * (effSoh * 0.01f));
+}
+

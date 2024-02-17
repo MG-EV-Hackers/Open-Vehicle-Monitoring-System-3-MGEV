@@ -52,6 +52,11 @@ constexpr uint32_t rxFlag = 0x8u;
 constexpr uint16_t softwarePid = 0xf194u;
 
 // BMS PIDs
+constexpr uint16_t engineSpeedPid = 0xcu;
+constexpr uint16_t vehicleSpeedPid = 0xdu;
+constexpr uint16_t ambTempPid = 0x46u;
+constexpr uint16_t socPid = 0x5bu;
+constexpr uint16_t odometerPid = 0xa6u;
 constexpr uint16_t cell1StatPid = 0xb001u;
 constexpr uint16_t cell2StatPid = 0xb009u;
 constexpr uint16_t cell3StatPid = 0xb011u;
