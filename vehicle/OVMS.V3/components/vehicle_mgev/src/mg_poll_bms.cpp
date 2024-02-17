@@ -320,7 +320,7 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
 
 void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
 {
-    ESP_LOGI(TAG, "BMS Status: %02X",status);
+    ESP_LOGD(TAG, "BMS Status: %02X",status);
     switch (status) {
         case StartingCharge:
         case Charging:
