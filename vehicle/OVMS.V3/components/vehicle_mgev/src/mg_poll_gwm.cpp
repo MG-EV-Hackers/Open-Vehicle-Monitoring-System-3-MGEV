@@ -37,7 +37,7 @@ namespace {
 
 // Responses to the BMS Status PID
 enum GwmStatus : unsigned char {
-    Off = 0x0,  // Seen when connected but not locked
+    Idle = 0x0,  // Seen when connected but not locked
     Acc = 0x31,  // When the car does not have the ignition on
     Ready = 0x75,  // When the ignition is on aux or running
     };
@@ -46,11 +46,16 @@ enum GwmStatus : unsigned char {
 void OvmsVehicleMgEv::IncomingGwmPoll(uint16_t pid, uint8_t* data, uint8_t length, uint16_t remain)
 {
     uint16_t odo = (data[0] << 16 | data[1] << 8 | data[2]);
+    //ESP_LOGI(TAG,"GWM Poll received");
 
     switch (pid)
     {
         case vehTimePid:
-            ESP_LOGD(TAG,"Vehicle Time PID Data: %d/%d/%d %d:",data[0], data[1], data[2], data[3]);
+            if(remain > 0) {
+                ESP_LOGD(TAG,"Date: %d/%d/%d",data[0], data[1], data[2]);
+            } else {
+                ESP_LOGD(TAG,"Time: %d:%d:%d",data[0], data[1], data[2]);
+            }
             break;
         case odoPid:
             ESP_LOGD(TAG,"Vehicle ODO = %d", odo);
@@ -60,23 +65,34 @@ void OvmsVehicleMgEv::IncomingGwmPoll(uint16_t pid, uint8_t* data, uint8_t lengt
             break;
         case vehStatusPid:
             ESP_LOGD(TAG,"Vehicle Status = %02" PRIx8,data[0]);
-            switch (data[0]) {
-                case 0x31:
-                    ESP_LOGD(TAG,"Vehicle Status = ACC");
-                    break;
-                case 0x75:
-                    ESP_LOGD(TAG,"Vehicle Status = Ready");
-                    break;
-                case 0:
-                    ESP_LOGD(TAG,"Vehicle Status = OFF");
-                    break;
-                default:
-                    ESP_LOGD(TAG,"Vehicle Status = Unknown");
-                    break;
+            if(m_gwm_state->AsInt() != data[0]) {
+                switch (data[0]) {
+                    case Acc:
+                        ESP_LOGI(TAG,"Vehicle Status = ACC");
+                        if(m_gwm_state->AsInt() == Ready) {
+                            ESP_LOGI(TAG,"Vehicle Status changed from Ready to Acc. Set Polls to Listen Only");
+                            PollSetState(PollStateListenOnly);
+                        }
+                        break;
+                    case Ready:
+                        ESP_LOGI(TAG,"Vehicle Status = Ready");
+                        break;
+                    case Idle:
+                        ESP_LOGI(TAG,"Vehicle Status = Idle");
+                        break;
+                    default:
+                        ESP_LOGI(TAG,"Vehicle Status = Unknown");
+                        break;
+                }
             }
+            m_gwm_state->SetValue(data[0]);
             break;
         case vinPid:
+            
             HandleVinMessage(data, length, remain);
+            if(remain==0) {
+                ESP_LOGD(TAG,"Vehicle VIN received");
+            }
             break;
     }
 }
