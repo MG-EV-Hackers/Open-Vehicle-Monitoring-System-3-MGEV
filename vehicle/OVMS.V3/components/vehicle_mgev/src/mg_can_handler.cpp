@@ -138,7 +138,7 @@ void OvmsVehicleMgEv::IncomingPollFrame(CAN_frame_t* frame)
                 }
                 default: 
                 {
-                    IncomingGWMFrame(frame, frameType, frameLength, serviceId, responsePid, data);
+                    //IncomingGWMFrame(frame, frameType, frameLength, serviceId, responsePid, data);
                     break;
                 }
             }            
@@ -224,6 +224,9 @@ void OvmsVehicleMgEv::IncomingPollReply(const OvmsPoller::poll_job_t &job, uint8
             break;
         case (bcmId | rxFlag):
             IncomingBcmPoll(job.pid, data, length);
-            break;            
+            break;
+        case (gwmId | rxFlag):
+            IncomingGwmPoll(job.pid, data, length, job.mlremain);
+            break;
     }
 }
