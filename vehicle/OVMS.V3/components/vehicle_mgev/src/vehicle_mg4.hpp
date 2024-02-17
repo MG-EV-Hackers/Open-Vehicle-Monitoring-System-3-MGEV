@@ -47,6 +47,8 @@ public:
     OvmsVehicleMg4();
     ~OvmsVehicleMg4();
     bool previousPollEnable;
+    float batteryVoltage;
+    float speed;
 protected:
     void Ticker1(uint32_t ticker) override;
     vehicle_command_t CommandWakeup() override;

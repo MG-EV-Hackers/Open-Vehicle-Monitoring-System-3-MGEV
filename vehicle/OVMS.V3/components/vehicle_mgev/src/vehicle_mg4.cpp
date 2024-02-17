@@ -39,56 +39,62 @@ namespace {
 const OvmsPoller::poll_pid_t mg4_obdii_polls[] =
 {
     { gwmId, gwmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vehTimePid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
-    { gwmId, gwmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, odoPid, {  0, 0, 20, 0  }, 0, ISOTP_STD },
-    { gwmId, gwmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vehStatusPid, {  0, 10, 10, 0  }, 0, ISOTP_STD },
+    { gwmId, gwmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, odoPid, {  0, 999, 20, 0  }, 0, ISOTP_STD },
+    { gwmId, gwmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vehStatusPid, {  0, 4, 4, 0  }, 0, ISOTP_STD },
     { gwmId, gwmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vinPid, {  0, 999, 999, 0  }, 0, ISOTP_STD },
-    //{ broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsStatusPid, {  0, 5, 5, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryBusVoltagePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryCurrentPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryVoltagePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryResistancePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batterySoCPid, {  0, 30, 30, 60  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryCoolantTempPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batterySoHPid, {  0, 120, 120, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryTempPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryErrorPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsRangePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell1StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell2StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell3StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell4StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell5StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell6StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell7StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell8StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell9StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell10StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell11StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell12StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell13StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell14StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell15StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell16StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell17StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell18StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell19StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell20StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell21StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell22StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell23StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell24StatPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsMaxCellVoltagePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsMinCellVoltagePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsTimePid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayBPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayGPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayPPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { broadcastId, bcmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bcmDoorPid, {  0, 1, 1, 0  }, 0, ISOTP_STD },
-    { broadcastId, bcmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bcmDrlPid, {  0, 5, 5, 0  }, 0, ISOTP_STD },
-    { broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccVoltagePid, {  0, 5, 0, 0  }, 0, ISOTP_STD },
-    { broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccAmperagePid, {  0, 5, 0, 0  }, 0, ISOTP_STD },
-    { broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccMaxAmperagePid, {  0, 30, 0, 0  }, 0, ISOTP_STD },
-    { broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccChargingPid, {  0, 1, 1, 0  }, 0, ISOTP_STD },
+
+    /*{ broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIICURRENT, vehicleSpeedPid, {  0, 999, 60, 0  }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIICURRENT, odometerPid, {  0, 999, 60, 0  }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIICURRENT, engineSpeedPid, {  0, 999, 60, 0  }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIICURRENT, ambTempPid, {  0, 999, 60, 0  }, 0, ISOTP_STD },*/
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsStatusPid, {  0, 4, 4, 0  }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryBusVoltagePid, {  0, 5, 30, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryCurrentPid, {  0, 5, 30, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryVoltagePid, {  0, 5, 30, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryResistancePid, {  0, 30, 30, 0 }, 0, ISOTP_STD },
+    //{ broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batterySoCPid, {  0, 90, 90, 120  }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIICURRENT, socPid, {  0, 30, 30, 60  }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryCoolantTempPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batterySoHPid, {  0, 540, 540, 0  }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryTempPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, batteryErrorPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsRangePid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell1StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell2StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell3StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell4StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell5StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell6StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell7StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell8StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell9StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell10StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell11StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell12StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell13StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell14StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell15StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell16StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell17StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell18StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell19StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell20StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell21StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell22StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell23StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, cell24StatPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsMaxCellVoltagePid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsMinCellVoltagePid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsTimePid, {  0, 90, 90, 0  }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayBPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayGPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayPPid, {  0, 260, 260, 0 }, 0, ISOTP_STD },
+    { broadcastId, bcmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bcmDoorPid, {  0, 5, 5, 0  }, 0, ISOTP_STD },
+    { broadcastId, bcmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bcmDrlPid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
+    { broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccVoltagePid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
+    { broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccAmperagePid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
+    { broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccMaxAmperagePid, {  0, 60, 0, 0  }, 0, ISOTP_STD },
+    { broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccChargingPid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
     { 0, 0, 0x00, 0x00, { 0, 0, 0, 0 }, 0, 0 }
 };
 }
@@ -105,36 +111,44 @@ OvmsVehicleMg4::OvmsVehicleMg4()
     int vehicleVersion = MyConfig.GetParamValueInt("xmg", "vehval", 0);
     switch (vehicleVersion) {
         case 0:
-            ESP_LOGD(TAG,"MG4 51kWh");
+            ESP_LOGI(TAG,"MG4 51kWh");
             StandardMetrics.ms_v_bat_range_full->SetValue(400.0);
             m_batt_capacity->SetValue(50.8);
             m_max_dc_charge_rate->SetValue(90);
             MyConfig.SetParamValueFloat("xmg","bms.dod.lower", 25.0);
             MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
+            m_trip_consumption->SetValue(145.0, WattHoursPK);
+            m_avg_consumption->SetValue(145.0, WattHoursPK);
             break;
         case 1:
-            ESP_LOGD(TAG,"MG4 64kWh");
+            ESP_LOGI(TAG,"MG4 64kWh");
             StandardMetrics.ms_v_bat_range_full->SetValue(450.0);
             m_batt_capacity->SetValue(61.7); //NCM 104cells 400V
             m_max_dc_charge_rate->SetValue(140.0);
             MyConfig.SetParamValueFloat("xmg","bms.dod.lower", 25.0);
             MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
+            m_trip_consumption->SetValue(140.0, WattHoursPK);
+            m_avg_consumption->SetValue(140.0, WattHoursPK);
             break;
         case 2:
-            ESP_LOGD(TAG,"MG4 77kWh");
+            ESP_LOGI(TAG,"MG4 77kWh");
             StandardMetrics.ms_v_bat_range_full->SetValue(625.0);
             m_batt_capacity->SetValue(74.4); //NCM 104cells 400V
             m_max_dc_charge_rate->SetValue(144.0);
             MyConfig.SetParamValueFloat("xmg","bms.dod.lower", 25.0);
             MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
+            m_trip_consumption->SetValue(143.0, WattHoursPK);
+            m_avg_consumption->SetValue(143.0, WattHoursPK);
             break;
         default:
-            ESP_LOGD(TAG,"MG4 51kWh");
+            ESP_LOGI(TAG,"MG4 51kWh");
             StandardMetrics.ms_v_bat_range_full->SetValue(400.0);
             m_batt_capacity->SetValue(50.8);
             m_max_dc_charge_rate->SetValue(90);
             MyConfig.SetParamValueFloat("xmg","bms.dod.lower", 25.0);
             MyConfig.SetParamValueFloat("xmg","bms.dod.upper", 930.0);
+            m_trip_consumption->SetValue(145.0, WattHoursPK);
+            m_avg_consumption->SetValue(145.0, WattHoursPK);
             break;
     }
     
@@ -145,6 +159,8 @@ OvmsVehicleMg4::OvmsVehicleMg4()
              MyConfig.GetParamValueFloat("xmg","bms.dod.upper"));
         
     previousPollEnable = m_enable_polling->AsBool();
+    batteryVoltage = StandardMetrics.ms_v_bat_12v_voltage->AsFloat();
+    speed = StandardMetrics.ms_v_pos_gpsspeed->AsFloat();
 
     //Add variant specific poll data
     ConfigureMG5PollData(mg4_obdii_polls, sizeof(mg4_obdii_polls));
@@ -184,11 +200,21 @@ void OvmsVehicleMg4::Ticker1(uint32_t ticker)
         return;
     }
     
+    // Sometimes gpsspeed seems to go above 0 when parked
+    const auto parkTime = StandardMetrics.ms_v_env_parktime->AsInt();
+
     if(!m_enable_polling->AsBool())
     {
-        if(MyConfig.GetParamValueInt("xmg", "pollval") == 1 && StandardMetrics.ms_v_env_charging12v->AsBool() && StandardMetrics.ms_v_pos_gpsspeed->AsFloat() > 3.0) {
-            m_enable_polling->SetValue(true);
-            MyNotify.NotifyStringf("info", "xmg.polling", "Driving - polling has been enabled");
+        if(StandardMetrics.ms_v_env_charging12v->AsBool() && StandardMetrics.ms_v_pos_gpslock->AsBool() && StandardMetrics.ms_v_pos_gpsspeed->AsFloat() > 5.0) {
+            if(speed > 5.0 && batteryVoltage >= CHARGING_THRESHOLD ) {
+                m_enable_polling->SetValue(true);
+                ESP_LOGI(TAG, "Driving - Polling has been enabled at %0.1fkPh and %0.2fVolts ", StandardMetrics.ms_v_pos_gpsspeed->AsFloat(), batteryVoltage);
+                MyNotify.NotifyStringf("info", "xmg.polling", "Driving - polling has been enabled");
+                StandardMetrics.ms_v_env_awake->SetValue(true);
+                StandardMetrics.ms_v_env_on->SetValue(true);
+            }
+                batteryVoltage = StandardMetrics.ms_v_bat_12v_voltage->AsFloat();
+                speed = StandardMetrics.ms_v_pos_gpsspeed->AsFloat();
         }
     }
     
@@ -212,6 +238,16 @@ void OvmsVehicleMg4::Ticker1(uint32_t ticker)
         }
         previousPollEnable = m_enable_polling->AsBool();
     }
+
+    if(!StandardMetrics.ms_v_env_charging12v->AsBool() && StandardMetrics.ms_v_pos_gpslock->AsBool() && StandardMetrics.ms_v_pos_gpsspeed->AsFloat() > 5.0) {
+        ESP_LOGD(TAG, "Speed is %0.1f and 12V Battery is %0.2f Parktime = %d", StandardMetrics.ms_v_pos_gpsspeed->AsFloat(), StandardMetrics.ms_v_bat_12v_voltage->AsFloat(), parkTime);
+        if(speed != StandardMetrics.ms_v_pos_gpsspeed->AsFloat() || batteryVoltage != StandardMetrics.ms_v_bat_12v_voltage->AsFloat()) {
+            ESP_LOGD(TAG, "Speed is %0.1f and 12V Battery is %0.2f Parktime = %d", speed, batteryVoltage, parkTime);
+            MyNotify.NotifyStringf("info", "xmg.polling", "Speed is %0.1f and 12V Battery is %0.2f Parktime = %d", speed, batteryVoltage, parkTime);
+        }
+            batteryVoltage = StandardMetrics.ms_v_bat_12v_voltage->AsFloat();
+            speed = StandardMetrics.ms_v_pos_gpsspeed->AsFloat();
+    }
     
     processEnergy();
 }
@@ -228,12 +264,14 @@ void OvmsVehicleMg4::MainStateMachine(canbus* currentBus, uint32_t ticker)
     //ESP_LOGD(TAG,"Polling is manual");
     if(!StandardMetrics.ms_v_env_charging12v->AsBool()) {
         // 12V not being charged so vehicle is off
+        PollSetState(PollStateListenOnly);
+        m_enable_polling->SetValue(false);
         StandardMetrics.ms_v_env_awake->SetValue(false);
         StandardMetrics.ms_v_env_on->SetValue(false);
-
         if(charging12vLast) {
             // Vehicle has just been turned off
             ESP_LOGD(TAG,"Vehicle just been turned off");
+            MyNotify.NotifyStringf("info", "xmg.polling", "Vehicle just been turned off");
             //It is possible that when the car stops charging, we go straight from charging to 12V level too low and so OVMS won't know that we have stopped charging.
             //So we manually set charging metrics here
             if (StandardMetrics.ms_v_charge_inprogress->AsBool())
@@ -250,8 +288,6 @@ void OvmsVehicleMg4::MainStateMachine(canbus* currentBus, uint32_t ticker)
                 StandardMetrics.ms_v_charge_inprogress->SetValue(false);
             }
         }
-        PollSetState(PollStateListenOnly);
-        m_enable_polling->SetValue(false);
     } else {
         if (m_enable_polling->AsBool()) {
             if (StandardMetrics.ms_v_charge_inprogress->AsBool())
@@ -266,6 +302,7 @@ void OvmsVehicleMg4::MainStateMachine(canbus* currentBus, uint32_t ticker)
             }
         } else {
             PollSetState(PollStateListenOnly);
+            ESP_LOGV(TAG,"Poll State Listen Only");
         }
     }
 }
@@ -274,6 +311,7 @@ void OvmsVehicleMg4::MainStateMachine(canbus* currentBus, uint32_t ticker)
 OvmsVehicle::vehicle_command_t OvmsVehicleMg4::CommandWakeup()
 {
     ESP_LOGI(TAG, "Starting Polling");
+    MyNotify.NotifyStringf("info", "xmg.polling", "Polling Started");
     m_enable_polling->SetValue(true);
     return OvmsVehicle::Success;
 }
