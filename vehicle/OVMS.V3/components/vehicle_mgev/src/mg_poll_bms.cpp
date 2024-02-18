@@ -112,15 +112,17 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
             // Save SOC for display
             StandardMetrics.ms_v_bat_soc->SetValue(currentSoc);
             calculateRange(currentSoc);
-            if (currentSoc < 99.5)
+            if (StandardMetrics.ms_v_charge_inprogress->AsBool())
             {
-                StandardMetrics.ms_v_charge_state->SetValue("charging");
-            }
-            else
-            {
-                StandardMetrics.ms_v_charge_state->SetValue("topoff");
-            }
-            break;
+                if (currentSoc < 99.5)
+                 {
+                 StandardMetrics.ms_v_charge_state->SetValue("charging");
+                 }
+                 else
+                 {
+                 StandardMetrics.ms_v_charge_state->SetValue("topoff");
+                 }
+            }break;
         }
         case ambTempPid:
         {
@@ -320,14 +322,19 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
 
 void OvmsVehicleMgEv::SetBmsStatus(uint8_t status)
 {
-    ESP_LOGD(TAG, "BMS Status: %02X",status);
     switch (status) {
         case StartingCharge:
+            ESP_LOGD(TAG, "BMS Status: Starting Charge %02X",status);
+        case Running:
+            ESP_LOGD(TAG, "BMS Status: Turned ON %02X",status);
+            break;
         case Charging:
-            StandardMetrics.ms_v_charge_inprogress->SetValue(true);
+            ESP_LOGD(TAG, "BMS Status: Charging %02X",status);
+            //StandardMetrics.ms_v_charge_inprogress->SetValue(true);
             StandardMetrics.ms_v_charge_type->SetValue("type2");
             break;
         case CcsCharging:
+            ESP_LOGD(TAG, "BMS Status: CCS Charging %02X",status);
             StandardMetrics.ms_v_charge_inprogress->SetValue(true);
             StandardMetrics.ms_v_charge_type->SetValue("ccs");
             //These are normally set in mg_poll_evcc.cpp but while CCS charging, EVCC won't show up so we set these here
