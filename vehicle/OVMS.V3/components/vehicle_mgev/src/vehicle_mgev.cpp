@@ -849,10 +849,7 @@ void OvmsVehicleMgEv::PollsCommandShell(int verbosity, OvmsWriter* writer, OvmsC
 bool OvmsVehicleMgEv::AuthenticateECU(vector<ECUAuth> ECUsToAuth)
 {
     // Pause the poller so we're not being interrupted
-    {
-        OvmsRecMutexLock lock(&m_poll_mutex);
-        m_poll_plist = nullptr;
-    }
+    PausePolling();
     bool AuthSucceeded = true;
     uint8_t a = 0;
     while (a < ECUsToAuth.size() && AuthSucceeded)
@@ -875,7 +872,7 @@ bool OvmsVehicleMgEv::AuthenticateECU(vector<ECUAuth> ECUsToAuth)
         a++;
     }
     // Re-start polling
-    m_poll_plist = m_pollData;
+    ResumePolling();
     return AuthSucceeded;
 }
 
