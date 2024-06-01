@@ -30,6 +30,7 @@
 */
 
 #include "vehicle_mgev.h"
+static const char *TAG = "v-mgev-vcu";
 
 namespace {
 
@@ -69,6 +70,7 @@ void OvmsVehicleMgEv::IncomingVcuPoll(
             break;
         case vcuVehicleSpeedPid:
             // Speed in kph
+            ESP_LOGD(TAG, "VCU Speed = %0.1f", ((data[0] << 8 | data[1]) - 20000) / 100.0);
             StandardMetrics.ms_v_pos_speed->SetValue(
                 ((data[0] << 8 | data[1]) - 20000) / 100.0
             );

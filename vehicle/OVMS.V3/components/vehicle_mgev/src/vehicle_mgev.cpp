@@ -68,45 +68,45 @@ const OvmsPoller::poll_pid_t common_obdii_polls[] =
     { bmsId, bmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsSystemMainRelayPPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
      */
     // { dcdcId, dcdcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, dcdcLvCurrentPid, {  0, 30, 30, 0  }, 0, ISOTP_STD }, //Unknown mapping for now
-    { dcdcId, dcdcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, dcdcPowerLoadPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { dcdcId, dcdcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, dcdcTemperaturePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuVinPid, { 0, 999, 999, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuHvContactorPid, {  0, 1, 1, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuIgnitionStatePid, {  0, 1, 1, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcu12vSupplyPid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuCoolantTempPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuMotorTempPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { dcdcId, dcdcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, dcdcPowerLoadPid,     {  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { dcdcId, dcdcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, dcdcTemperaturePid,   {  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuVinPid,              { 0, 999, 999, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuHvContactorPid,      {  0, 1, 1, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuIgnitionStatePid,    {  0, 1, 1, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcu12vSupplyPid,        {  0, 60, 60, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuCoolantTempPid,      {  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuMotorTempPid,        {  0, 30, 30, 0  }, 0, ISOTP_STD },
     { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuChargerConnectedPid, {  0, 5, 5, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuVehicleSpeedPid, {  0, 0, 1, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuMotorSpeedPid, {  0, 0, 5, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuMotorTorquePid, {  0, 0, 5, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuOdometerPid, {  0, 0, 20, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuHandbrakePid, {  0, 0, 5, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuGearPid, {  0, 0, 5, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuBrakePid, {  0, 0, 5, 0  }, 0, ISOTP_STD },
-    // { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuBonnetPid, {  0, 0, 5, 0  }, 0, ISOTP_STD }, //Can use bcmDoorPid.
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, chargeRatePid, {  0, 30, 0, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuAcPowerPid, {  0, 5, 5, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuBatteryVoltagePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuRadiatorFanPid, {  0, 5, 5, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcModePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuVehicleSpeedPid,     {  0, 0, 1, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuMotorSpeedPid,       {  0, 0, 5, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuMotorTorquePid,      {  0, 0, 5, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuOdometerPid,         {  0, 0, 20, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuHandbrakePid,        {  0, 0, 5, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuGearPid,             {  0, 0, 5, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuBrakePid,            {  0, 0, 5, 0  }, 0, ISOTP_STD },
+    // { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuBonnetPid,        {  0, 0, 5, 0  }, 0, ISOTP_STD }, //Can use bcmDoorPid.
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, chargeRatePid,          {  0, 30, 0, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuAcPowerPid,          {  0, 5, 5, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuBatteryVoltagePid,   {  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuRadiatorFanPid,      {  0, 5, 5, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcModePid,         {  0, 30, 30, 0  }, 0, ISOTP_STD },
     { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcInputCurrentPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
     { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcInputVoltagePid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcOutputCurrentPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcOutputVoltagetPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcTempPid, {  0, 30, 30, 0  }, 0, ISOTP_STD },
-    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcAmbientTempPid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
-    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcSetTempPid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
-    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcFaceOutletTempPid, {  0, 0, 30, 0  }, 0, ISOTP_STD },
-    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcBlowerSpeedPid, {  0, 0, 30, 0  }, 0, ISOTP_STD },
-    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcPtcTempPid, {  0, 30, 10, 0  }, 0, ISOTP_STD },
-    // { pepsId, pepsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, pepsLockPid, {  0, 5, 5, 0  }, 0, ISOTP_STD }, //Can use bcmDoorPid.
-    { tpmsId, tpmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, tyrePressurePid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
-    { tpmsId, tpmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, tyreTemperaturePid, {  0, 60, 60, 0  }, 0, ISOTP_STD },
-    { evccId, evccId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccVoltagePid, {  0, 5, 0, 0  }, 0, ISOTP_STD },
-    { evccId, evccId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccAmperagePid, {  0, 5, 0, 0  }, 0, ISOTP_STD },
-    { evccId, evccId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccMaxAmperagePid, {  0, 30, 0, 0  }, 0, ISOTP_STD },
-    { evccId, evccId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccChargingPid, {  0, 1, 1, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcOutputCurrentPid,{  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcOutputVoltagetPid,{  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { vcuId, vcuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vcuDcDcTempPid,         {  0, 30, 30, 0  }, 0, ISOTP_STD },
+    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcAmbientTempPid,      {  0, 60, 60, 0  }, 0, ISOTP_STD },
+    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcSetTempPid,          {  0, 60, 60, 0  }, 0, ISOTP_STD },
+    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcFaceOutletTempPid,   {  0, 0, 30, 0  }, 0, ISOTP_STD },
+    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcBlowerSpeedPid,      {  0, 0, 30, 0  }, 0, ISOTP_STD },
+    { atcId, atcId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, atcPtcTempPid,          {  0, 30, 10, 0  }, 0, ISOTP_STD },
+    // { pepsId, pepsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, pepsLockPid,       {  0, 5, 5, 0  }, 0, ISOTP_STD }, //Can use bcmDoorPid.
+    { tpmsId, tpmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, tyrePressurePid,      {  0, 60, 60, 0  }, 0, ISOTP_STD },
+    { tpmsId, tpmsId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, tyreTemperaturePid,   {  0, 60, 60, 0  }, 0, ISOTP_STD },
+    { evccId, evccId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccVoltagePid,       {  0, 5, 0, 0  }, 0, ISOTP_STD },
+    { evccId, evccId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccAmperagePid,      {  0, 5, 0, 0  }, 0, ISOTP_STD },
+    { evccId, evccId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccMaxAmperagePid,   {  0, 30, 0, 0  }, 0, ISOTP_STD },
+    { evccId, evccId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccChargingPid,      {  0, 1, 1, 0  }, 0, ISOTP_STD },
     { 0, 0, 0x00, 0x00, { 0, 0, 0, 0 }, 0, 0 }
 };
 
@@ -340,6 +340,7 @@ void OvmsVehicleMgEv::processEnergy()
             auto energy = bat_power / 3600.0;
             // Calculate current (A) used for one second.
             auto coulombs = (StandardMetrics.ms_v_bat_current->AsFloat() / 3600.0);
+          
             // Car is still parked so trip has not started.
             // Set all values to zero
             if (StandardMetrics.ms_v_env_drivetime->AsInt() == 0) {
@@ -418,7 +419,7 @@ void OvmsVehicleMgEv::processEnergy()
         // Calculate time to reach 100% charge
         int minsremaining_full = StandardMetrics.ms_v_charge_type->AsString() == "ccs" ? calcMinutesRemaining(100, ccs_steps) : calcMinutesRemaining(100, granny_steps);
         StandardMetrics.ms_v_charge_duration_full->SetValue(minsremaining_full);
-        ESP_LOGV(TAG, "Time remaining: %d mins to full", minsremaining_full);
+        ESP_LOGD(TAG, "Time remaining: %d mins to full", minsremaining_full);
         
         // Calculate time to charge to SoC Limit
         if (limit_soc > 0)
@@ -431,7 +432,7 @@ void OvmsVehicleMgEv::processEnergy()
                 MyNotify.NotifyStringf("info", "charge.limit.soc", "Charge limit of %d%% reached", limit_soc);
                 soc_limit_reached = true;
             }
-            ESP_LOGV(TAG, "Time remaining: %d mins to %d%% soc", minsremaining_soc, limit_soc);
+            ESP_LOGD(TAG, "Time remaining: %d mins to %d%% soc", minsremaining_soc, limit_soc);
         }
         
         // Calculate time to charge to Range Limit
@@ -446,7 +447,7 @@ void OvmsVehicleMgEv::processEnergy()
                 MyNotify.NotifyStringf("info", "charge.limit.range", "Charge limit of %dkm reached", (int) limit_range);
                 range_limit_reached = true;
             }
-            ESP_LOGV(TAG, "Time remaining: %d mins for %0.0f km (%d%% soc)", minsremaining_range, limit_range, range_soc);
+            ESP_LOGD(TAG, "Time remaining: %d mins for %0.0f km (%d%% soc)", minsremaining_range, limit_range, range_soc);
         }
         // When we are not charging set back to zero ready for next charge.
     }
@@ -522,7 +523,7 @@ void OvmsVehicleMgEv::UpdateTripCounters()
     if ( m_odo_trip > 0.1 && speed > 5.0) {
         m_trip_consumption->SetValue((StdMetrics.ms_v_bat_energy_used->AsFloat() - StdMetrics.ms_v_bat_energy_recd->AsFloat()) * 1000 / m_odo_trip);
         
-        ESP_LOGW(TAG, "%0.2fKWh/100k over %0.2fKm @ %0.2fkph", m_trip_consumption->AsFloat(0, kWhP100K), m_odo_trip, speed);
+        ESP_LOGD(TAG, "%0.2fKWh/100k over %0.2fKm @ %0.2fkph", m_trip_consumption->AsFloat(0, kWhP100K), m_odo_trip, speed);
     }
 }
 

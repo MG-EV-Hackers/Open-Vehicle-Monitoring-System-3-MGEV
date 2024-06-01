@@ -94,9 +94,10 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
         case vehicleSpeedPid:
         {
             int vehSpeed = data[0];
-            if (vehSpeed > 0) {
-                ESP_LOGI(TAG, "Vehicle Speed = %dkph", vehSpeed);
-            }
+            StandardMetrics.ms_v_pos_speed->SetValue(vehSpeed);
+            //if (vehSpeed > 0) {
+                //ESP_LOGI(TAG, "Vehicle Speed = %dkph", vehSpeed);
+            //}
             break;
         }
         case odometerPid:
@@ -127,7 +128,8 @@ void OvmsVehicleMgEv::IncomingBmsPoll(
         case ambTempPid:
         {
             int ambTemp = data[0] - 40;
-                ESP_LOGI(TAG, "Outside Temperature = %dDeg", ambTemp);
+            StandardMetrics.ms_v_env_temp->SetValue(ambTemp);
+                //ESP_LOGI(TAG, "Outside Temperature = %dDeg", ambTemp);
             break;
         }
         case cell1StatPid:

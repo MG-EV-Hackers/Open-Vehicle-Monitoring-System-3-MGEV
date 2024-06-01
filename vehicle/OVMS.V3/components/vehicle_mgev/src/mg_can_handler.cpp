@@ -29,7 +29,7 @@
 ; THE SOFTWARE.
 */
 
-static const char *TAG = "v-mgev";
+static const char *TAG = "v-mgev-can";
 
 #include "vehicle_mgev.h"
 
