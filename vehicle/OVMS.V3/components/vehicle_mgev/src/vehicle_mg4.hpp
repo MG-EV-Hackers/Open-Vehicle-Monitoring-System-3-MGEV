@@ -62,7 +62,8 @@ protected:
   vehicle_command_t CommandWakeup() override;
   
 private:
-  void MainStateMachine(canbus* currentBus, uint32_t ticker);
+  //void MainStateMachine(canbus* currentBus, uint32_t ticker);
+  void checkPollState();
 };
 
 

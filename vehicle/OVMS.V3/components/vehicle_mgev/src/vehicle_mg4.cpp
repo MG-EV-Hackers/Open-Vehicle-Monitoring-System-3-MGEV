@@ -231,7 +231,7 @@ void OvmsVehicleMg4::Ticker1(uint32_t ticker)
 		batteryVoltage = StandardMetrics.ms_v_bat_12v_voltage->AsFloat();
 		speed = StandardMetrics.ms_v_pos_gpsspeed->AsFloat();
 	}
-	
+	/*
 	// New code
 	batteryVoltage = StandardMetrics.ms_v_bat_12v_voltage->AsFloat();
 	if (batteryVoltage >= 13.9) { // Charging with vehicle OFF
@@ -300,7 +300,8 @@ void OvmsVehicleMg4::Ticker1(uint32_t ticker)
 				ESP_LOGD(TAG,"Poll State Running");
 			}
 		}
-	}
+	}*/
+    checkPollState();
 	processEnergy();
 }
 
@@ -333,66 +334,79 @@ OvmsVehicleMg4Init::OvmsVehicleMg4Init()
 	MyVehicleFactory.RegisterVehicle<OvmsVehicleMg4>("MG4", "MG 4");
 }
 
-/*
- // This is the only place we evaluate the vehicle state to change the action of OVMS
- void OvmsVehicleMg4::MainStateMachine(canbus* currentBus, uint32_t ticker)
- {
- 
- // Store last 12V charging state and re-evaluate if the 12V is charging
- const auto charging12vLast = StandardMetrics.ms_v_env_charging12v->AsBool();
- 
- StandardMetrics.ms_v_env_charging12v->SetValue(
- StandardMetrics.ms_v_bat_12v_voltage->AsFloat() >= CHARGING_THRESHOLD);
- //ESP_LOGD(TAG,"Polling is manual");
- if(!StandardMetrics.ms_v_env_charging12v->AsBool()) {
- // 12V not being charged so vehicle is off
- PollSetState(PollStateListenOnly);
- m_enable_polling->SetValue(false);
- StandardMetrics.ms_v_env_awake->SetValue(false);
- StandardMetrics.ms_v_env_on->SetValue(false);
- if(charging12vLast) {
- // Vehicle has just been turned off
- ESP_LOGD(TAG,"Vehicle just been turned off");
- MyNotify.NotifyStringf("info", "xmg.polling", "Vehicle just been turned off");
- //It is possible that when the car stops charging, we go straight from charging to 12V level too low and so OVMS won't know that we have stopped charging.
- //So we manually set charging metrics here
- if (StandardMetrics.ms_v_charge_inprogress->AsBool())
- {
- if (StandardMetrics.ms_v_bat_soc->AsFloat() >= 99.9) //Set to 99.9 instead of 100 incase of mathematical errors
- {
- StandardMetrics.ms_v_charge_state->SetValue("done");
- }
- else
- {
- StandardMetrics.ms_v_charge_state->SetValue("stopped");
- }
- StandardMetrics.ms_v_charge_type->SetValue("undefined");
- StandardMetrics.ms_v_charge_inprogress->SetValue(false);
- }
- }
- } else {
- if (m_enable_polling->AsBool()) {
- if (StandardMetrics.ms_v_charge_inprogress->AsBool())
- {
- PollSetState(PollStateCharging);
- ESP_LOGV(TAG,"Poll State Charging");
- }
- else
- {
- PollSetState(PollStateRunning);
- ESP_LOGV(TAG,"Poll State Running");
- }
- } else {
- PollSetState(PollStateListenOnly);
- ESP_LOGV(TAG,"Poll State Listen Only");
- if (!StandardMetrics.ms_v_charge_inprogress->AsBool()) {
- if (StandardMetrics.ms_v_bat_12v_voltage->AsFloat() >= 14.0) {
- ESP_LOGI(TAG,"12V Battery is over 14V so vehicle is charging");
- StandardMetrics.ms_v_charge_inprogress->SetValue(true);
- }
- }
- }
- }
- }
- */
+// This is the only place we evaluate the vehicle state to change the action of OVMS
+void OvmsVehicleMg4::checkPollState()
+{
+    batteryVoltage = StandardMetrics.ms_v_bat_12v_voltage->AsFloat();
+    if (batteryVoltage <= CHARGING_THRESHOLD)
+    { // Parked ond turned off
+        m_enable_polling->SetValue(false);
+        StandardMetrics.ms_v_env_charging12v->SetValue(false);
+        StandardMetrics.ms_v_env_on->SetValue(false);
+        if (vehState != VehicleStateParked)
+        {
+            ESP_LOGD(TAG, "Vehicle is parked. 12V Battery=%0.1f", batteryVoltage);
+            vehState = VehicleStateParked;
+            PollSetState(PollStateListenOnly);
+            StandardMetrics.ms_v_env_awake->SetValue(false);
+            if (StandardMetrics.ms_v_charge_inprogress->AsBool()) // If still showing charging must have just stopped
+            {
+                if (StandardMetrics.ms_v_bat_soc->AsFloat() >= 99.9) //Set to 99.9 instead of 100 incase of mathematical errors
+                {
+                    StandardMetrics.ms_v_charge_state->SetValue("done");
+                }
+                else
+                {
+                    StandardMetrics.ms_v_charge_state->SetValue("stopped");
+                }
+                StandardMetrics.ms_v_charge_type->SetValue("undefined");
+                StandardMetrics.ms_v_charge_inprogress->SetValue(false);
+            }
+        }
+        else
+        {
+            StandardMetrics.ms_v_env_awake->SetValue(false);  // DO WE NEED THIS
+        }
+    }
+    else
+    { // 12V is above the threshold voltage. Driving or Charging
+        StandardMetrics.ms_v_env_charging12v->SetValue(true);
+        if (vehState != VehicleStateDriving) {
+            ESP_LOGD(TAG, "Vehicle is ON. 12V Battery=%0.1f", batteryVoltage);
+            vehState = VehicleStateDriving;
+            StandardMetrics.ms_v_env_awake->SetValue(true);
+        }
+        else if(!m_enable_polling->AsBool())
+        { // If not polling check to see if we are driving
+            if(StandardMetrics.ms_v_pos_gpslock->AsBool() && StandardMetrics.ms_v_pos_gpsspeed->AsFloat() > 5.0)
+            {
+                if(speed > 5.0)
+                { // If speed is over 5kph for the second time we must be driving
+                    PollSetState(PollStateRunning);
+                    m_enable_polling->SetValue(true);
+                    ESP_LOGD(TAG, "Driving - Polling has been enabled at %0.1fkPh and %0.2fVolts ", StandardMetrics.ms_v_pos_gpsspeed->AsFloat(), batteryVoltage);
+                    MyNotify.NotifyStringf("info", "xmg.polling", "Driving - polling has been enabled");
+                    StandardMetrics.ms_v_env_on->SetValue(true);
+                    StandardMetrics.ms_v_charge_inprogress->SetValue(false);
+                }
+                speed = StandardMetrics.ms_v_pos_gpsspeed->AsFloat();
+                StandardMetrics.ms_v_pos_speed->SetValue(speed);
+            }
+        }
+        else
+        { // Polling is enabled
+            if (StandardMetrics.ms_v_charge_inprogress->AsBool())
+            {
+                PollSetState(PollStateCharging);
+                ESP_LOGD(TAG,"Poll State Charging");
+            }
+            else
+            {
+                PollSetState(PollStateRunning);
+                ESP_LOGD(TAG,"Poll State Running");
+            }
+        }
+    }
+}
+
 
