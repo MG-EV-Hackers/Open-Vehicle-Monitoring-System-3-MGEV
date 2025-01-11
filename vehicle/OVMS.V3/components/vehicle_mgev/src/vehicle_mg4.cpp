@@ -40,7 +40,7 @@ const OvmsPoller::poll_pid_t mg4_obdii_polls[] =
 {
 	{ gwmId, gwmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vehStatusPid, 					{  0, 1, 1, 0  }, 0, ISOTP_STD },// 0xd001u
 	{ broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bmsStatusPid, 			{  0, 15, 6, 0  }, 0, ISOTP_STD },// 0xb048u
-	{ broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccChargingPid, 			{  0, 15, 6, 0  }, 0, ISOTP_STD },// 0xb00fu
+	{ broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccChargingPid, 			{  0, 1, 1, 0  }, 0, ISOTP_STD },// 0xb00fu
 	{ broadcastId, bmsMk2Id | rxFlag, VEHICLE_POLL_TYPE_OBDIICURRENT, socPid,                   {  0, 15, 6, 60  }, 0, ISOTP_STD },// 0X5bu
 	{ gwmId, gwmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, vehTimePid, 						{  0, 60, 60, 0  }, 0, ISOTP_STD },// 0x010bu
 	{ gwmId, gwmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, odoPid, 							{  0, 999, 30, 0  }, 0, ISOTP_STD },// 0xb921u
@@ -93,8 +93,8 @@ const OvmsPoller::poll_pid_t mg4_obdii_polls[] =
 	
 	{ broadcastId, bcmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bcmDoorPid,                 {  0, 15, 15, 0  }, 0, ISOTP_STD },// 0xd112u
 	{ broadcastId, bcmId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, bcmDrlPid,                  {  0, 60, 60, 0  }, 0, ISOTP_STD },
-	{ broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccVoltagePid,             {  0, 15, 0, 0  }, 0, ISOTP_STD },
-	{ broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccAmperagePid,            {  0, 15, 0, 0  }, 0, ISOTP_STD },
+	{ broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccVoltagePid,             {  0, 5, 0, 0  }, 0, ISOTP_STD },
+	{ broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccAmperagePid,            {  0, 5, 0, 0  }, 0, ISOTP_STD },
 	{ broadcastId, ccuId | rxFlag, VEHICLE_POLL_TYPE_OBDIIEXTENDED, evccMaxAmperagePid,         {  0, 180, 0, 0  }, 0, ISOTP_STD },
 	{ 0, 0, 0x00, 0x00, { 0, 0, 0, 0 }, 0, 0 }
 };
@@ -333,80 +333,4 @@ OvmsVehicleMg4Init::OvmsVehicleMg4Init()
 	
 	MyVehicleFactory.RegisterVehicle<OvmsVehicleMg4>("MG4", "MG 4");
 }
-
-// This is the only place we evaluate the vehicle state to change the action of OVMS
-void OvmsVehicleMg4::checkPollState()
-{
-    batteryVoltage = StandardMetrics.ms_v_bat_12v_voltage->AsFloat();
-    if (batteryVoltage <= CHARGING_THRESHOLD)
-    { // Parked ond turned off
-        m_enable_polling->SetValue(false);
-        StandardMetrics.ms_v_env_charging12v->SetValue(false);
-        StandardMetrics.ms_v_env_on->SetValue(false);
-        if (vehState != VehicleStateParked)
-        {
-            ESP_LOGD(TAG, "Vehicle is parked. 12V Battery=%0.1f", batteryVoltage);
-            vehState = VehicleStateParked;
-            PollSetState(PollStateListenOnly);
-            StandardMetrics.ms_v_env_awake->SetValue(false);
-            if (StandardMetrics.ms_v_charge_inprogress->AsBool()) // If still showing charging must have just stopped
-            {
-                if (StandardMetrics.ms_v_bat_soc->AsFloat() >= 99.9) //Set to 99.9 instead of 100 incase of mathematical errors
-                {
-                    StandardMetrics.ms_v_charge_state->SetValue("done");
-                }
-                else
-                {
-                    StandardMetrics.ms_v_charge_state->SetValue("stopped");
-                }
-                StandardMetrics.ms_v_charge_type->SetValue("undefined");
-                StandardMetrics.ms_v_charge_inprogress->SetValue(false);
-            }
-        }
-        else
-        {
-            StandardMetrics.ms_v_env_awake->SetValue(false);  // DO WE NEED THIS
-        }
-    }
-    else
-    { // 12V is above the threshold voltage. Driving or Charging
-        StandardMetrics.ms_v_env_charging12v->SetValue(true);
-        if (vehState != VehicleStateDriving) {
-            ESP_LOGD(TAG, "Vehicle is ON. 12V Battery=%0.1f", batteryVoltage);
-            vehState = VehicleStateDriving;
-            StandardMetrics.ms_v_env_awake->SetValue(true);
-        }
-        else if(!m_enable_polling->AsBool())
-        { // If not polling check to see if we are driving
-            if(StandardMetrics.ms_v_pos_gpslock->AsBool() && StandardMetrics.ms_v_pos_gpsspeed->AsFloat() > 5.0)
-            {
-                if(speed > 5.0)
-                { // If speed is over 5kph for the second time we must be driving
-                    PollSetState(PollStateRunning);
-                    m_enable_polling->SetValue(true);
-                    ESP_LOGD(TAG, "Driving - Polling has been enabled at %0.1fkPh and %0.2fVolts ", StandardMetrics.ms_v_pos_gpsspeed->AsFloat(), batteryVoltage);
-                    MyNotify.NotifyStringf("info", "xmg.polling", "Driving - polling has been enabled");
-                    StandardMetrics.ms_v_env_on->SetValue(true);
-                    StandardMetrics.ms_v_charge_inprogress->SetValue(false);
-                }
-                speed = StandardMetrics.ms_v_pos_gpsspeed->AsFloat();
-                StandardMetrics.ms_v_pos_speed->SetValue(speed);
-            }
-        }
-        else
-        { // Polling is enabled
-            if (StandardMetrics.ms_v_charge_inprogress->AsBool())
-            {
-                PollSetState(PollStateCharging);
-                ESP_LOGD(TAG,"Poll State Charging");
-            }
-            else
-            {
-                PollSetState(PollStateRunning);
-                ESP_LOGD(TAG,"Poll State Running");
-            }
-        }
-    }
-}
-
 

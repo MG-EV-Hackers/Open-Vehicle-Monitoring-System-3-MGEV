@@ -78,6 +78,12 @@ typedef struct{
 
 }
 
+enum VehicleStates {
+  VehicleStateParked = 0,
+  VehicleStateCharging,
+  VehicleStateDriving,
+};
+
 class OvmsCommand;
 
 class OvmsVehicleMgEv : public OvmsVehicle
@@ -175,6 +181,7 @@ class OvmsVehicleMgEv : public OvmsVehicle
     // Form the poll list for OVMS to use by using only the common list
     void ConfigurePollData();
     void ConfigureMG5PollData(const OvmsPoller::poll_pid_t *SpecificPollData, size_t DataSize);
+    void checkPollState();
 
     // Integer to string without padding
     static string IntToString(int x);
@@ -278,6 +285,9 @@ class OvmsVehicleMgEv : public OvmsVehicle
     double m_odo_trip;
     uint32_t m_tripfrac_reftime;
     float m_tripfrac_refspeed;
+    float batteryVoltage;
+    float speed;
+    VehicleStates vehState;
 
     // mg_configuration.cpp
     int CanInterface();

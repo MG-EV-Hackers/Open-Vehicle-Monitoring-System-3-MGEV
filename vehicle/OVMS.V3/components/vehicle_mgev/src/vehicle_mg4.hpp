@@ -41,29 +41,23 @@
  #define BMSDoDUpperLimit 930.0
  #define BMSDoDLowerLimit 25.0*/
 
-enum VehicleStates {
-  VehicleStateParked = 0,
-  VehicleStateCharging,
-  VehicleStateDriving,
-};
 
 class OvmsVehicleMg4 : public OvmsVehicleMgEv
 {
 public:
-  OvmsVehicleMg4();
-  ~OvmsVehicleMg4();
-  bool previousPollEnable;
-  float batteryVoltage;
-  float speed;
-  VehicleStates vehState;
-  
+    OvmsVehicleMg4();
+    ~OvmsVehicleMg4();
+    bool previousPollEnable;
+    float batteryVoltage;
+    float speed;
+    VehicleStates vehState;
+    
 protected:
-  void Ticker1(uint32_t ticker) override;
-  vehicle_command_t CommandWakeup() override;
-  
+    void Ticker1(uint32_t ticker) override;
+    vehicle_command_t CommandWakeup() override;
+    
 private:
-  //void MainStateMachine(canbus* currentBus, uint32_t ticker);
-  void checkPollState();
+    
 };
 
 
