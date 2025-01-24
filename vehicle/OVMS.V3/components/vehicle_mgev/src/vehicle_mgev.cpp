@@ -522,7 +522,7 @@ void OvmsVehicleMgEv::UpdateTripCounters()
     if ( m_odo_trip > 0.1 && speed > 5.0) {
         m_trip_consumption->SetValue((StdMetrics.ms_v_bat_energy_used->AsFloat() - StdMetrics.ms_v_bat_energy_recd->AsFloat()) * 1000 / m_odo_trip);
         
-        ESP_LOGW(TAG, "%0.2fKWh/100k over %0.2fKm @ %0.2fkph", m_trip_consumption->AsFloat(0, kWhP100K), m_odo_trip, speed);
+        ESP_LOGD(TAG, "%0.2fKWh/100k over %0.2fKm @ %0.2fkph", m_trip_consumption->AsFloat(0, kWhP100K), m_odo_trip, speed);
     }
 }
 
