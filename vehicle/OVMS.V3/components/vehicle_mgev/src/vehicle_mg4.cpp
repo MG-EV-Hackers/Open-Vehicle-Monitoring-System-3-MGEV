@@ -104,6 +104,9 @@ const OvmsPoller::poll_pid_t mg4_obdii_polls[] =
 OvmsVehicleMg4::OvmsVehicleMg4()
 {
 	ESP_LOGI(TAG, "Starting MG4 variant");
+    
+    // Remove when Boot_Crash_Fix pull request done
+    m_poll_bus_default = m_can1;
 	
 	// Set manual polling on
 	MyConfig.SetParamValueInt("xmg", "polling.manual", 1);
@@ -162,7 +165,9 @@ OvmsVehicleMg4::OvmsVehicleMg4()
 	
 	//Add variant specific poll data
 	ConfigureMG5PollData(mg4_obdii_polls, sizeof(mg4_obdii_polls));
-	
+    PollSetState(PollStateListenOnly);
+    m_enable_polling->SetValue(true);
+    
 	//BMS Configuration
 	BmsSetCellArrangementVoltage(42, 2);
 	BmsSetCellArrangementTemperature(42, 2);
@@ -232,18 +237,23 @@ void OvmsVehicleMg4::Ticker1(uint32_t ticker)
 		speed = StandardMetrics.ms_v_pos_gpsspeed->AsFloat();
 	}
 	
-	// New code
+	// Changed code so that polling will start when 12V goes over 13V (PollStateRunning).
+    // If left unlocked and charging is started, will change to PollStateCharging.
+    // Vehicle can now be locked without alarm going off.
+    // When charge is turned off or vehicle is locked after driving, Poll State goes to PollStateListenOnly.
+    
 	batteryVoltage = StandardMetrics.ms_v_bat_12v_voltage->AsFloat();
-	if (batteryVoltage >= 13.9) { // Charging with vehicle OFF
-		StandardMetrics.ms_v_env_charging12v->SetValue(true);
-		if (m_enable_polling->AsBool()) {
-			PollSetState(PollStateCharging);
-		}
-		if (vehState != VehicleStateCharging) {
-			ESP_LOGD(TAG, "Vehicle is charging. 12V Battery=%0.1f", batteryVoltage);
-			vehState = VehicleStateCharging;
-		}
-	} else if (batteryVoltage <= 13) { // Parked
+//	if (batteryVoltage >= 13.9) { // Charging with vehicle OFF
+//		StandardMetrics.ms_v_env_charging12v->SetValue(true);
+//		if (m_enable_polling->AsBool()) {
+//			PollSetState(PollStateCharging);
+//		}
+//		if (vehState != VehicleStateCharging) {
+//			ESP_LOGD(TAG, "Vehicle is charging. 12V Battery=%0.1f", batteryVoltage);
+//			vehState = VehicleStateCharging;
+//		}
+//    } else if (batteryVoltage <= 13) { // Parked
+    if (batteryVoltage <= 13) { // Parked
 		StandardMetrics.ms_v_env_charging12v->SetValue(false);
 		StandardMetrics.ms_v_env_on->SetValue(false);
 		if (vehState != VehicleStateParked) {
@@ -269,35 +279,39 @@ void OvmsVehicleMg4::Ticker1(uint32_t ticker)
 		} else {
 			StandardMetrics.ms_v_env_awake->SetValue(false);
 		}
-	} else { // Driving or Charging
+	} else { // Driving or Charging 12V is >13V
 		StandardMetrics.ms_v_env_charging12v->SetValue(true);
 		if (vehState != VehicleStateDriving) {
 			ESP_LOGD(TAG, "Vehicle is ON. 12V Battery=%0.1f", batteryVoltage);
 			vehState = VehicleStateDriving;
 			StandardMetrics.ms_v_env_awake->SetValue(true);
-		} else if(!m_enable_polling->AsBool()) {
-			if(StandardMetrics.ms_v_pos_gpslock->AsBool() && StandardMetrics.ms_v_pos_gpsspeed->AsFloat() > 5.0) {
-				if(speed > 5.0) {
-					PollSetState(PollStateRunning);
-					m_enable_polling->SetValue(true);
-					ESP_LOGD(TAG, "Driving - Polling has been enabled at %0.1fkPh and %0.2fVolts ", StandardMetrics.ms_v_pos_gpsspeed->AsFloat(), batteryVoltage);
-					MyNotify.NotifyStringf("info", "xmg.polling", "Driving - polling has been enabled");
-					StandardMetrics.ms_v_env_on->SetValue(true);
-					StandardMetrics.ms_v_charge_inprogress->SetValue(false);
-				}
-				speed = StandardMetrics.ms_v_pos_gpsspeed->AsFloat();
-				StandardMetrics.ms_v_pos_speed->SetValue(speed);
-			}
+            PollSetState(PollStateRunning);
+            m_enable_polling->SetValue(true);
+//		} else if(!m_enable_polling->AsBool()) {
+//			if(StandardMetrics.ms_v_pos_gpslock->AsBool() && StandardMetrics.ms_v_pos_gpsspeed->AsFloat() > 5.0) {
+//				if(speed > 5.0) {
+//					PollSetState(PollStateRunning);
+//					m_enable_polling->SetValue(true);
+//					ESP_LOGD(TAG, "Driving - Polling has been enabled at %0.1fkPh and %0.2fVolts ", StandardMetrics.ms_v_pos_gpsspeed->AsFloat(), batteryVoltage);
+//					MyNotify.NotifyStringf("info", "xmg.polling", "Driving - polling has been enabled");
+//					StandardMetrics.ms_v_env_on->SetValue(true);
+//					StandardMetrics.ms_v_charge_inprogress->SetValue(false);
+//				}
+//				speed = StandardMetrics.ms_v_pos_gpsspeed->AsFloat();
+//				StandardMetrics.ms_v_pos_speed->SetValue(speed);
+//			}
 		} else { // Polling is enabled
 			if (StandardMetrics.ms_v_charge_inprogress->AsBool())
 			{
 				PollSetState(PollStateCharging);
 				ESP_LOGD(TAG,"Poll State Charging");
+                m_enable_polling->SetValue(false);
 			}
 			else
 			{
 				PollSetState(PollStateRunning);
 				ESP_LOGD(TAG,"Poll State Running");
+                m_enable_polling->SetValue(false);
 			}
 		}
 	}
